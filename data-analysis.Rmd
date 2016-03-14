@@ -11,15 +11,41 @@ library(knitr)
 
 # Data Processing
 
-We first load the CSV file containing our data and take a glimpse at its structure.
+We first load our CSV file and take a glimpse at its contents.
 
 ```{r}
 data.raw <- read.csv('all-semi-unique.csv')
 glimpse(data.raw)
 ```
 
-At first glance, we see that our raw data is composed of approximately 430k observations of 34 variables. Knowing that variables prefixed with 'ad.' contain information relevant only to the application's advertising logic, we may safely drop them as they will not be used in our investigation.
+At first glance, we see that our raw data is composed of approximately 430k observations of 34 variables. Knowing that variables prefixed with **ad.** contain information relevant only to the application's advertising logic, we may safely drop them as they will not be used in our investigation.
 
 ```{r}
-data.road <- data.raw %>% select(-(ad.aid:ad.g))
+data.road <- data.raw %>% select(-(starts_with("ad.")))
 ```
+
+Now that we have dropped variables that will not be of interest, we can investigate for variables that always carry a constant value in our observations
+```{r}
+data.road %>%
+  sapply(unique) %>%
+  sapply(length)
+```
+
+We can spot two variables that are always constant: **rd.cl** and **rd.rp.type**. Since they add no information to our data, we may safely discard them. We then take note of the format the *crawl_date* variable is in.
+
+```{r}
+data.road <- data.road %>% select(-(rd.cl), -(rd.rp.type))
+head(data.road$crawl_date)
+```
+
+The crawl_date variable is currently set as a factor of different strings. We proceed to parse this into a more machine readable format.
+
+```{r}
+data.road$crawl_date <- 
+  strptime(data.road$crawl_date, format = "%a %b %e %X UTC %Y", tz = "UTC") %>% 
+  as.POSIXct()
+head(data.road$crawl_date)
+```
+
+
+
