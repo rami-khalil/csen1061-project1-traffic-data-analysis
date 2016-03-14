@@ -25,6 +25,7 @@ data.road <- data.raw %>% select(-(starts_with("ad.")))
 ```
 
 Now that we have dropped variables that will not be of interest, we can investigate for variables that always carry a constant value in our observations
+
 ```{r}
 data.road %>%
   sapply(unique) %>%
@@ -38,7 +39,7 @@ data.road <- data.road %>% select(-(rd.cl), -(rd.rp.type))
 head(data.road$crawl_date)
 ```
 
-The crawl_date variable is currently set as a factor of different strings. We proceed to parse this into a more machine readable format.
+The crawl_date column currently contains a factor of different strings. We proceed to parse this into a more machine readable format as a column of time values.
 
 ```{r}
 data.road$crawl_date <- 
@@ -47,5 +48,4 @@ data.road$crawl_date <-
 head(data.road$crawl_date)
 ```
 
-
-
+Upon further inspection of bey2ollak.com: rd.rp.hr and rd.rp.mn are the time differences between the crawl_date and the report. rd.rp.cmid is the id of the comment. ri is the road id.
