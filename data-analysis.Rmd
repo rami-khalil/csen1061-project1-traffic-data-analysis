@@ -3,4 +3,23 @@ title: Traffic Data Analysis
 output: html_document
 ---
 
-this is where things start :)
+```{r}
+library(ggplot2)
+library(dplyr)
+library(knitr)
+```
+
+# Data Processing
+
+We first load the CSV file containing our data and take a glimpse at its structure.
+
+```{r}
+data.raw <- read.csv('all-semi-unique.csv')
+glimpse(data.raw)
+```
+
+At first glance, we see that our raw data is composed of approximately 430k observations of 34 variables. Knowing that variables prefixed with 'ad.' contain information relevant only to the application's advertising logic, we may safely drop them as they will not be used in our investigation.
+
+```{r}
+data.road <- data.raw %>% select(-(ad.aid:ad.g))
+```
