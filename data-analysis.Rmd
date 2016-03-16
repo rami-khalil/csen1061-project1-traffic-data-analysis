@@ -48,4 +48,12 @@ data.road$crawl_date <-
 head(data.road$crawl_date)
 ```
 
-Upon further inspection of bey2ollak.com: rd.rp.hr and rd.rp.mn are the time differences between the crawl_date and the report. rd.rp.cmid is the id of the comment. ri is the road id.
+Upon further inspection of bey2ollak.com's response data: rd.rp.hr and rd.rp.mn are the time differences between the crawl_date and the report submission time. This means we can estimate the time of the response submission accurately down to a minute, which should be sufficient for our purposes.
+
+```{r}
+data.road <- data.road %>%
+  mutate(report_time = as.POSIXct(round(crawl_date - (rd.rp.hr*60*60 + rd.rp.mn*60), "mins"))) %>%
+  select(-c(rd.rp.mn, rd.rp.hr))
+```
+
+rd.rp.cmid is the id of the comment. ri is the road id.
