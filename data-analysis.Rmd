@@ -11,6 +11,8 @@ library(knitr)
 
 # Data Processing
 
+## Initialization
+
 We first load our CSV file and take a glimpse at its contents.
 
 ```{r}
@@ -20,11 +22,15 @@ glimpse(data.raw)
 
 At first glance, we see that our raw data is composed of approximately 430k observations of 34 variables. Knowing that variables prefixed with **ad.** contain information relevant only to the application's advertising logic, we may safely drop them as they will not be used in our investigation.
 
+## Advertising data removal
+
 ```{r}
 data.road <- data.raw %>% select(-(starts_with("ad.")))
 ```
 
 Now that we have dropped variables that will not be of interest, we can investigate for variables that always carry a constant value in our observations
+
+## Removing constant valued columns
 
 ```{r}
 data.road %>%
@@ -39,6 +45,8 @@ data.road <- data.road %>% select(-(rd.cl), -(rd.rp.type))
 head(data.road$crawl_date)
 ```
 
+## Crawl date format
+
 The crawl_date column currently contains a factor of different strings. We proceed to parse this into a more machine readable format as a column of time values.
 
 ```{r}
@@ -48,7 +56,9 @@ data.road$crawl_date <-
 head(data.road$crawl_date)
 ```
 
-Upon further inspection of bey2ollak.com's response data: rd.rp.hr and rd.rp.mn are the time differences between the crawl_date and the report submission time. This means we can estimate the time of the response submission accurately down to a minute, which should be sufficient for our purposes.
+## Report submission time estimation
+
+Upon further inspection of bey2ollak.com's response data: **rd.rp.hr** and **rd.rp.mn** are the time differences between the crawl date and the report submission time. This means we can estimate the time of the response submission accurately down to a minute, which should be sufficient for our purposes. 
 
 ```{r}
 data.road <- data.road %>%
@@ -56,4 +66,19 @@ data.road <- data.road %>%
   select(-c(rd.rp.mn, rd.rp.hr))
 ```
 
-rd.rp.cmid is the id of the comment. ri is the road id.
+## Road status update time estimation
+
+**rd.hr** and **rd.mn** reflect how much time has passed since a road's status was updated on bey2ollak's end. We can extrapolate the last time a road's status was updated using similar means.
+
+```{r}
+data.road <- data.road %>%
+  mutate(last_road_update = as.POSIXct(round(crawl_date - (rd.hr*60*60 + rd.mn*60), "mins"))) %>%
+  select(-c(rd.mn, rd.hr))
+```
+
+
+```{r}
+glimpse(data.road)
+```
+
+rd.rp.cmid is the id of the comment. ri is the road id. img is the user profile image id, rpImg is the id of the image attached to the report if any. strq, I guess, refers to street request? it appears any road with only one direction or segment has this set to zero, while the others are set to one. cmrq might refer to comment request?
