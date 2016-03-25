@@ -177,32 +177,32 @@ data.road <- data.road %>%
 
 We will now attempt to extrapolate travel speeds so we can use them as the main metric later on in our analysis.
 
-Knowing that **rd.rp.cmid** is the id of a report, we can isolate the report data to enable further anaylsis.
+First, we will note that bey2ollak's auto report feature uses the following categorization for speed ranges:
+
+Classification  | Speed Range  | rd.rp.stid 
+--------------- | ------------ | -----------
+7alawa          | 80+          | 1
+lazeez          | 40-79        | 2
+mashy           | 20-39        | 3
+za7ma           | 10-19        | 4
+mafeesh 2amal   | 0-9          | 5
+
+The following rd.rp.stid values also correspond to different report types:
+
+Type          | rd.rp.stid
+------------- | -----------
+so2al         | 6
+khatar        | 7
+7adsa         | 8
+3otl          | 9
+ba2ollak eh   | 10
+
+A report can include both a congestion rating (7alawa - mafeesh 2amal) and/or a khatar/7adsa/3otl warning, or a report can be a so2al/ba2ollak eh. Unfortunately, the data crawling eliminated multiple <stid> tags and some information was lost.
+
+We will proceed to initially use this classification to approximate the value of a new column we will introduce which will represent average travel speed.
 
 ```{r}
-data.road.reports <- data.road %>% 
-  select(rd.ri, rd.rp.nm, rd.rp.stid, rd.rp.cm, rd.rp.cmid, rd.rp.rpImg, report_time) %>%
-  unique()
-data.road.reports %>% nrow() # what we have
-data.road.reports %>% select(rd.rp.cmid) %>% unique() %>% nrow() # our target
-```
 
-Bey2ollak's API returns results with at most two stid tags per report. This is used in a report to indicate a road's congestion level and/or a 7adsa/khatar/3otl. Our crawling appears to have saved two entries for each report that carries two <stid> tags.
-
-```{r}
-cmid_dupes <- data.road.reports %>% select(rd.rp.cmid) %>% duplicated()
-cmid_stid_dupes <- data.road.reports %>% select(rd.rp.cmid, rd.rp.stid) %>% duplicated()
-mul_stid <- cmid_dupes & !cmid_stid_dupes
-data.road.reports %>% subset(mul_stid) %>% arrange(desc(rd.rp.cmid)) %>% head()
-```
-
-We just have to note that due to the way we estimate the report times, some duplication of the reports will occur. We can remedy this by ignoring the possible *off-by-one* differences in **report_time** estimates resulting from our accruacy being limited to ±1m.
-
-```{r}
-rpt_dupes <- data.road.reports %>% select(-(report_time)) %>% duplicated()
-
-data.road.reports <- data.road.reports %>% subset(!rpt_dupes)
-data.road.reports %>% nrow()
 ```
 
 el data zai el zeft... kan momken n-crawl a7san mn keda b kteir
