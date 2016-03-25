@@ -252,7 +252,14 @@ rm(regexp, matched, subs, matches)
 data.road %>% select(speed) %>% is.na() %>% sum()
 ```
 
-el data zai el zeft... kan momken n-crawl a7san mn keda b kteir
+Now we can isolate "ba2ollak eh" reports that do not contain any speed information. Furthermore, as the remaining NA values are normally distributed across report_times, and are small relative to the data set, we will discard them.
+
+```{r}
+data.info <- data.road %>%
+  filter(rd.rp.stid == 10 & is.na(speed))
+data.road <- data.road %>%
+  filter(!is.na(speed))
+```
 
 # Descriptive analysis
 
