@@ -173,6 +173,19 @@ data.road <- data.road %>%
   unique()
 ```
 
+## Report time estimate errors
+
+We are now in the position to partially account for some duplicates that result due to the error margin present in our report time estimates. We can remedy this by ignoring the possible *off-by-one* differences in **report_time** estimates resulting from our accruacy being limited to ± 1 minute.
+
+```{r}
+rpt_dupes <- data.road %>%
+  select(-(report_time)) %>%
+  duplicated()
+data.road.reports <- data.road %>%
+  subset(!rpt_dupes)
+rm(rpt_dupes)
+```
+
 ## Extracting travel speeds
 
 We will now attempt to extrapolate travel speeds so we can use them as the main metric later on in our analysis.
@@ -185,7 +198,7 @@ Classification  | Speed Range  | rd.rp.stid
 lazeez          | 40-79        | 2
 mashy           | 20-39        | 3
 za7ma           | 10-19        | 4
-mafeesh 2amal   | 0-9          | 5
+mafeesh amal    | 0-9          | 5
 
 The following rd.rp.stid values also correspond to different report types:
 
@@ -197,12 +210,46 @@ khatar        | 7
 3otl          | 9
 ba2ollak eh   | 10
 
-A report can include both a congestion rating (7alawa - mafeesh 2amal) and/or a khatar/7adsa/3otl warning, or a report can be a so2al/ba2ollak eh. Unfortunately, the data crawling eliminated multiple <stid> tags and some information was lost.
-
-We will proceed to initially use this classification to approximate the value of a new column we will introduce which will represent average travel speed.
+A report can include both a congestion rating (7alawa - mafeesh 2amal) and/or a khatar/7adsa/3otl warning, or a report can be a so2al/ba2ollak eh. Unfortunately, the data crawling eliminated multiple <stid> tags and some information was lost. We can extract the questions since it is reasonable to assume they do not contribute to congestion level information.
 
 ```{r}
+data.questions <- data.road %>%
+  filter(rd.rp.stid == 6)
+data.road <- data.road %>%
+  filter(rd.rp.stid != 6)
+data.road %>% nrow()
+```
 
+We will proceed to initially use the above classifications to approximate the value of a new column we will introduce which will represent average travel speed.
+
+```{r}
+data.road <- data.road %>%
+  mutate(speed = NA)
+data.road$speed[data.road$rd.rp.stid == 1] <- 85
+data.road$speed[data.road$rd.rp.stid == 2] <- 60
+data.road$speed[data.road$rd.rp.stid == 3] <- 30
+data.road$speed[data.road$rd.rp.stid == 4] <- 15
+data.road$speed[data.road$rd.rp.stid == 5] <- 5
+data.road %>% select(speed) %>% is.na() %>% sum()
+```
+
+The automatic reporter produces templated comments containing our desired values. We can use these to fine tune our speed column values.
+
+```{r}
+library(stringr)
+regexp <- "(\\d+ km/h)|(\\d+ كم/س)"
+matched <- grepl(regexp, data.road$rd.rp.cm)
+
+subs <- data.road$rd.rp.cm %>%
+  subset(matched)
+matches <- regmatches(subs, regexpr(regexp, subs))
+data.road$speed[matched] <- gsub("\\D", " ", matches) %>%
+  str_trim(side = "both") %>%
+  as.integer()
+
+rm(regexp, matched, subs, matches)
+
+data.road %>% select(speed) %>% is.na() %>% sum()
 ```
 
 el data zai el zeft... kan momken n-crawl a7san mn keda b kteir
