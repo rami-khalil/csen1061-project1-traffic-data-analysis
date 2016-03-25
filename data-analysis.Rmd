@@ -96,24 +96,69 @@ data.road$rd.minornm[is.na(data.road$rd.minornm)] <- "NO_MINOR"
 
 ## Extracting road status snapshots
 
-Each crawl of the data represents a snapshot of all the road statuses at that time if we have the right perspective. Since every entry in our data is the road status data appended to some report data, we can isolate the road status information for analysis.
+Each crawl of the data represents a snapshot of all the road statuses at that time if we take the right perspective. Since every entry in our data is the road status data appended to some report data, we can isolate the road status information for analysis.
 
-First, let us ensure that the missing values in rd.stid are not repairable through referring to another data entry in the same crawl.
+First, let us ensure that we have only a single rd.stid for each road per crawl.
+
 ```{r}
 numberOfTripletsWithSTID <- data.road %>% select(crawl_date, rd.ri, rd.stid) %>% unique() %>% nrow()
 numberOfTriplets <- data.road %>% select(crawl_date, rd.ri) %>% unique() %>% nrow()
 numberOfTriplets == numberOfTripletsWithSTID
 ```
 
-We can now proceed to isolate road status snapshots.
+We can now proceed to isolate road status snapshots knowing that taking unique pairs will not result in information loss.
 
 ```{r}
 data.road.status <- data.road %>% select(crawl_date, rd.ri, rd.stid) %>% unique()
 glimpse(data.road.status)
 ```
 
-We will use this data subset later on in visualization.
+## Extracting reports
 
+Knowing that **rd.rp.cmid** is the id of a report, we can isolate the report data to enable further anaylsis.
+
+```{r}
+data.road.reports <- data.road %>% 
+  select(rd.ri, rd.rp.fullnm, rd.rp.stid, rd.rp.cm, rd.rp.cmid, rd.rp.rpImg, rd.rp.img, report_time, rd.majornm, rd.minornm) %>%
+  unique()
+data.road.reports %>% nrow() # what we have
+data.road.reports %>% select(rd.rp.cmid) %>% unique() %>% nrow() # our target
+```
+
+Bey2ollak's API returns results with at most two stid tags per report. This is used in a report to indicate a road's congestion level and/or a 7adsa/khatar/3otl. Our crawling appears to have saved two entries for each report that carries two <stid> tags.
+
+```{r}
+cmid_dupes <- data.road.reports %>% select(rd.rp.cmid) %>% duplicated()
+cmid_stid_dupes <- data.road.reports %>% select(rd.rp.cmid, rd.rp.stid) %>% duplicated()
+mul_stid <- cmid_dupes & !cmid_stid_dupes
+data.road.reports %>% subset(mul_stid) %>% arrange(desc(rd.rp.cmid)) %>% head()
+```
+
+We just have to note that due to the way we estimate the report times, some duplication of the reports will occur. We can remedy this by ignoring the possible *off-by-one* differences in **report_time** estimates resulting from our accruacy being limited to ±1m.
+
+```{r}
+rpt_dupes <- data.road.reports %>% select(-(report_time)) %>% duplicated()
+
+data.road.reports <- data.road.reports %>% subset(!rpt_dupes)
+data.road.reports %>% nrow()
+```
+
+el data zai el zeft... kan momken n-crawl a7san mn keda b kteir
+
+# Descriptive analysis
+
+
+
+
+# Inferential analysis
+
+## Image attachment likelihood
+
+## Weekend night za7ma
+
+## Weekday morning za7ma
+
+*Take note of public holidays*
 
 
 ## And beyond..
@@ -123,3 +168,17 @@ glimpse(data.road)
 ```
 
 rd.rp.cmid is the id of the comment. ri is the road id. img is the user profile image id, rpImg is the id of the image attached to the report if any. strq, I guess, refers to street request? it appears any road with only one direction or segment has this set to zero, while the others are set to one. cmrq might refer to comment request?
+
+rd.rp.stid:
+1   7alawa :D
+2   lazeez  :)
+3   mashy :|
+4   za7ma  :(
+5   mafeesh 2amal :'(
+6   so2al ?
+7   khatar X
+8   7adsa =:=
+9   3otl /\
+10  ba2olak eh !
+
+rd.stid:
