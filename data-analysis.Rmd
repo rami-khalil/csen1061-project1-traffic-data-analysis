@@ -177,13 +177,11 @@ data.road <- data.road %>%
 
 We will now attempt to extrapolate travel speeds so we can use them as the main metric later on in our analysis.
 
-
-
 Knowing that **rd.rp.cmid** is the id of a report, we can isolate the report data to enable further anaylsis.
 
 ```{r}
 data.road.reports <- data.road %>% 
-  select(rd.ri, rd.rp.fullnm, rd.rp.stid, rd.rp.cm, rd.rp.cmid, rd.rp.rpImg, rd.rp.img, report_time, rd.majornm, rd.minornm) %>%
+  select(rd.ri, rd.rp.nm, rd.rp.stid, rd.rp.cm, rd.rp.cmid, rd.rp.rpImg, report_time) %>%
   unique()
 data.road.reports %>% nrow() # what we have
 data.road.reports %>% select(rd.rp.cmid) %>% unique() %>% nrow() # our target
