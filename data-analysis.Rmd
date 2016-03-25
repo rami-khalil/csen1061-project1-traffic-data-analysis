@@ -28,7 +28,8 @@ At first glance, we see that our raw data is composed of approximately 430k obse
 Knowing that variables prefixed with **ad.** contain information relevant only to the application's advertising logic, we may safely drop them as they will not be used in our investigation.
 
 ```{r}
-data.road <- data.raw %>% select(-(starts_with("ad.")))
+data.road <- data.raw %>%
+  select(-(starts_with("ad.")))
 ```
 
 ## Removing constant valued columns
@@ -44,7 +45,8 @@ data.road %>%
 We can spot two variables that are always constant: **rd.cl** and **rd.rp.type**. Since they add no information to our data, we may safely discard them. We then take note of the format the *crawl_date* variable is in.
 
 ```{r}
-data.road <- data.road %>% select(-(rd.cl), -(rd.rp.type))
+data.road <- data.road %>%
+  select(-(rd.cl), -(rd.rp.type))
 head(data.road$crawl_date)
 ```
 
@@ -53,8 +55,8 @@ head(data.road$crawl_date)
 The crawl_date column currently contains a factor of different strings. We proceed to parse this into a more machine readable format as a column of time values.
 
 ```{r}
-data.road$crawl_date <- 
-  strptime(data.road$crawl_date, format = "%a %b %e %X UTC %Y", tz = "UTC") %>% 
+data.road$crawl_date <-
+  strptime(data.road$crawl_date, format = "%a %b %e %X UTC %Y", tz = "UTC") %>%
   as.POSIXct()
 head(data.road$crawl_date)
 ```
@@ -94,6 +96,24 @@ Some reports belong to a major road name as a whole with no minor road name. We 
 data.road$rd.minornm[is.na(data.road$rd.minornm)] <- "NO_MINOR"
 ```
 
+We will now migrate the road names data to a different data frame in order to separate concerns.
+
+```{r}
+data.road_names <- data.road %>%
+  select(rd.ri, rd.majornm, rd.minornm) %>%
+  unique()
+num_ids <- data.road_names %>%
+  select(rd.ri) %>%
+  unique() %>%
+  nrow()
+num_entries <- data.road_names %>% nrow()
+num_ids == num_entries # # check for problems, expect TRUE
+rm(num_ids, num_entries) # cleanup env
+
+data.road <- data.road %>%
+  select(-c(rd.majornm, rd.minornm))
+```
+
 ## Extracting road status snapshots
 
 Each crawl of the data represents a snapshot of all the road statuses at that time if we take the right perspective. Since every entry in our data is the road status data appended to some report data, we can isolate the road status information for analysis.
@@ -101,19 +121,63 @@ Each crawl of the data represents a snapshot of all the road statuses at that ti
 First, let us ensure that we have only a single rd.stid for each road per crawl.
 
 ```{r}
-numberOfTripletsWithSTID <- data.road %>% select(crawl_date, rd.ri, rd.stid) %>% unique() %>% nrow()
-numberOfTriplets <- data.road %>% select(crawl_date, rd.ri) %>% unique() %>% nrow()
-numberOfTriplets == numberOfTripletsWithSTID
+numberOfTripletsWithSTID <- data.road %>%
+  select(crawl_date, rd.ri, rd.stid) %>%
+  unique() %>%
+  nrow()
+numberOfTriplets <- data.road %>%
+  select(crawl_date, rd.ri) %>%
+  unique() %>%
+  nrow()
+numberOfTriplets == numberOfTripletsWithSTID # check for problems, expect TRUE
+rm(numberOfTriplets, numberOfTripletsWithSTID) # cleanup env
 ```
 
 We can now proceed to isolate road status snapshots knowing that taking unique pairs will not result in information loss.
 
 ```{r}
-data.road.status <- data.road %>% select(crawl_date, rd.ri, rd.stid) %>% unique()
-glimpse(data.road.status)
+data.road.status <- data.road %>%
+  select(crawl_date, rd.ri, rd.stid) %>%
+  unique()
+table(data.road.status$rd.stid)
 ```
 
-## Extracting reports
+Unfortunately, due to the way the data was crawled, there is an overwhelming amount of rows with **rd.stid** equal to 10 (info). This destroys the information conveyed by bey2olak about the road and renders this approach useless unless we attempt to approximate the correct congestion levels.
+
+We choose discard the polluted column and attempt to follow a different approach. As we have also chosen to disregard the "snapshots" of road status, we may also discard the **crawl_date** and **last_road_update** columns.
+
+```{r}
+rm(data.road.status)
+data.road <- data.road %>%
+  select(-c(rd.stid, crawl_date, last_road_update)) %>%
+  unique()
+```
+
+## Application-specific data elimination
+
+We choose to discard **rd.new**, **rd.strq**, **rd.cmrq** and **rd.img** as they play a role in bey2ollak's application functionality and will not provide traffic insight.
+
+```{r}
+data.road <- data.road %>%
+  select(-c(rd.new, rd.strq, rd.cmrq, rd.img)) %>%
+  unique()
+```
+
+## User information
+
+We choose not to do any analysis on user profiles, such as inspecting wether users with profile images/full names tend to be more or less active, and drop both the **rd.rp.fullnm** and **rd.rp.img** columns.
+
+```{r}
+data.road <- data.road %>%
+  select(-c(rd.rp.fullnm, rd.rp.img)) %>%
+  unique()
+```
+
+## Extracting travel speeds
+
+We will now attempt to extrapolate travel speeds so we can use them as the main metric later on in our analysis.
+
+
 
 Knowing that **rd.rp.cmid** is the id of a report, we can isolate the report data to enable further anaylsis.
 
@@ -170,11 +234,11 @@ glimpse(data.road)
 rd.rp.cmid is the id of the comment. ri is the road id. img is the user profile image id, rpImg is the id of the image attached to the report if any. strq, I guess, refers to street request? it appears any road with only one direction or segment has this set to zero, while the others are set to one. cmrq might refer to comment request?
 
 rd.rp.stid:
-1   7alawa :D
-2   lazeez  :)
-3   mashy :|
-4   za7ma  :(
-5   mafeesh 2amal :'(
+1   7alawa :D 80+
+2   lazeez  :) 40-79
+3   mashy :| 20-39
+4   za7ma  :( 10-19
+5   mafeesh 2amal :'( 9-
 6   so2al ?
 7   khatar X
 8   7adsa =:=
