@@ -181,7 +181,7 @@ We are now in the position to partially account for some duplicates that result 
 rpt_dupes <- data.road %>%
   select(-(report_time)) %>%
   duplicated()
-data.road.reports <- data.road %>%
+data.road <- data.road %>%
   subset(!rpt_dupes)
 rm(rpt_dupes)
 ```
