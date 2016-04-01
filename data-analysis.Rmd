@@ -252,7 +252,7 @@ rm(regexp, matched, subs, matches)
 data.road %>% select(speed) %>% is.na() %>% sum()
 ```
 
-Now we can isolate "ba2ollak eh" reports that do not contain any speed information. Furthermore, as the remaining NA values are normally distributed across report_times, and are small relative to the data set, we will discard them.
+Now we can isolate "ba2ollak eh" reports that do not contain any speed information. Furthermore, as the remaining NA values are randomly distributed across report_times, and are small in quantity relative to the remaining observation count, we will discard them.
 
 ```{r}
 data.info <- data.road %>%
@@ -261,9 +261,18 @@ data.road <- data.road %>%
   filter(!is.na(speed))
 ```
 
+## Isolating Speed Reports
+
+```{r}
+data.speed <- data.road %>%
+  select(rd.ri, rd.rp.cmid, report_time, speed) %>%
+  rename(road = rd.ri, comment = rd.rp.cmid) %>%
+  unique()
+```
+
 # Descriptive analysis
 
-
+We are now left with a clean set of observations of approximate average travel speeds across different roads at different times.
 
 
 # Inferential analysis
