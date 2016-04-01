@@ -274,19 +274,48 @@ data.speed <- data.road %>%
 
 We are now left with a clean set of observations of approximate average travel speeds across different roads at different times.
 
+```{r}
+glimpse(data.speed)
+```
+
+## Data distribution across time
+
+Our main concern in this report is not application usage analysis, but it will be useful to develop some insight into the distribution of our data points across our crawling timespan. This will help us identify any gaps in our knowledge of speed data.
+
+```{r}
+bins <- data.speed %>%
+  split(cut(data.speed$report_time, "hour"))
+sizes <- sapply(bins, nrow)
+plot(sizes, type = "l")
+```
+
+We can observe from the above plot that our data is quite sparse in the first few days and in the last day of our crawl range. Therefore, we will focus our analysis on the two weeks from 07/02 until 21/02, where our data is not assumed to have gaps.
+
+```{r}
+left_boundary <- as.POSIXct(strptime("2016-02-07 04:00:00", "%F %X"), tz = "UTC")
+right_boundary <- as.POSIXct(strptime("2016-02-21 04:00:00", "%F %X"), tz = "UTC")
+data.speed <- data.speed %>%
+  filter(report_time >= left_boundary, report_time < right_boundary)
+bins <- data.speed %>%
+  split(cut(data.speed$report_time, "hour"))
+sizes <- sapply(bins, nrow)
+plot(sizes, type = "l")
+```
+
+
+We need to divide the reports into one hour time buckets, for each road, across the entire range.
+
+Average speed of cars per road across time
+
+Correlation of average speeds between roads
+
+## Average Speed Graph
+
+## Ringroad Heatmap
 
 # Inferential analysis
 
-## Image attachment likelihood
-
-## Weekend night za7ma
-
-## Weekday morning za7ma
-
-*Take note of public holidays*
-
-
-## And beyond..
+# And beyond..
 
 ```{r}
 glimpse(data.road)
