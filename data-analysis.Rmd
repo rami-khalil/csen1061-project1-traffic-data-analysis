@@ -8,6 +8,7 @@ library(ggplot2)
 library(dplyr)
 library(knitr)
 library(tidyr)
+library(reshape2)
 ```
 
 # Data Processing
@@ -333,13 +334,55 @@ ID   |   Segment
 282  |     Sokhna Exit To Autostrad
  31  |          Autostrad To Moneeb
 
-```{r}
-ring_road     <- c(32, 281, 315, 316, 302, 285, 286, 122, 125)
-ring_road_ccw <- c(31, 282, 318, 317, 301, 284, 283, 121, 126)
+We will now define the analysis procedure that is to be carried out on both directions of the ring road. We have already checked the filtered data for consistency across the selected time period and acceptable results were found.
 
-roadAnalysis <- function(segments) {
+```{r}
+ring_road     <- c(31, 282, 318, 317, 301, 284, 283, 121, 126)
+ring_road_ccw <- c(32, 281, 315, 316, 302, 285, 286, 122, 125)
+
+roadAnalysis <- function(segments, L = left_boundary, R = right_boundary) {
+  focus <- data.speed %>%
+    filter(report_time >= L, report_time < R)
   
+  bins <- focus %>%
+    split(cut(focus$report_time, "hour"))
+  
+  subs <- lapply(bins, function(bin) {
+    tmp <- bin %>% 
+      filter(road %in% segments) %>% 
+      group_by(road) %>% 
+      summarise(avg_spd = mean(speed))
+    
+    ord <- tmp[order(factor(tmp$road, levels = segments)),]
+    
+    dframe <- data.frame(matrix(0, ncol = nrow(tmp), nrow = 1))
+    names(dframe) <- ord$road
+    dframe[1,] <- ord$avg_spd
+    return(dframe)
+  })
+  
+  dframe <- rbind_all(subs)
+  row.names(dframe) <- names(subs)
+  names(dframe) <- 1:9
+  dmatrix <- data.matrix(dframe)
+  #hmap <- heatmap(dmatrix, Rowv=NA, Colv=NA, col = heat.colors(256), scale="column", margins=c(5,10))
+  return(ggplot(melt(dmatrix), aes(Var2, Var1, fill = value)) + geom_raster())
 }
+```
+
+### Clockwise
+
+```{r}
+roadAnalysis(
+  ring_road,
+  as.POSIXct(strptime("2016-02-07 04:00:00", "%F %X"), tz = "UTC"),
+  as.POSIXct(strptime("2016-02-08 00:00:00", "%F %X"), tz = "UTC"))
+```
+
+### Counter-clockwise
+
+```{r}
+roadAnalysis(ring_road_ccw)
 ```
 
 ## Speed tables
