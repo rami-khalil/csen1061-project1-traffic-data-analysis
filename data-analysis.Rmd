@@ -362,13 +362,19 @@ roadAnalysis <- function(segments, L = left_boundary, R = right_boundary) {
   })
   
   dframe <- rbind_all(subs)
+  
+  print(tail(subs))
+  print(tail(dframe))
+  
   row.names(dframe) <- names(subs)
   names(dframe) <- 1:9
+
   dmatrix <- data.matrix(dframe)
+  print(tail(dmatrix))
   #hmap <- heatmap(dmatrix, Rowv=NA, Colv=NA, col = heat.colors(256), scale="column", margins=c(5,10))
   return(
     ggplot(melt(dmatrix), aes(Var2, Var1, fill = value)) + 
-      geom_raster() + 
+      geom_raster(interpolate = TRUE) + 
       scale_fill_continuous(na.value = 'steelblue'))
 }
 ```
@@ -379,7 +385,7 @@ roadAnalysis <- function(segments, L = left_boundary, R = right_boundary) {
 roadAnalysis(
   ring_road,
   as.POSIXct(strptime("2016-02-07 04:00:00", "%F %X"), tz = "UTC"),
-  as.POSIXct(strptime("2016-02-08 00:00:00", "%F %X"), tz = "UTC"))
+  as.POSIXct(strptime("2016-02-12 04:00:00", "%F %X"), tz = "UTC"))
 ```
 
 ### Counter-clockwise
