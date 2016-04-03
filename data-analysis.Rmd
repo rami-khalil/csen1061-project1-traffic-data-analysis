@@ -305,11 +305,11 @@ sizes <- sapply(bins, nrow)
 plot(sizes, type = "l")
 ```
 
-We can now see clear usage patterns across weekdays and weekends.
+We can now see some app usage patterns across weekdays and weekends.
 
 # The Ring Road
 
-Even though our data fits in memory, we have a plethora of information. Traffic flow data, even when captured for a couple of cities over two weeks, represents a very complex system with many intricacies that can not be summed up in a few global metrics In this analysis, we will carry out a small practical analysis by isolating the ring road data.
+Even though our data fits in memory, we have a plethora of information. Traffic flow data, even when only recorded sparsely for a couple of cities over two weeks, represents the ongoings of a very complex system with many intricacies that can not be summed up in a few global metrics. Therefore, we will carry out a small practical analysis by isolating the ring road data, which forms a cohesive road that can be meshed together and examined for speed patterns.
 
 ID   |   Segment
 ---- | ------------------------------
@@ -334,7 +334,12 @@ ID   |   Segment
  31  |          Autostrad To Moneeb
 
 ```{r}
+ring_road     <- c(32, 281, 315, 316, 302, 285, 286, 122, 125)
+ring_road_ccw <- c(31, 282, 318, 317, 301, 284, 283, 121, 126)
 
+roadAnalysis <- function(segments) {
+  
+}
 ```
 
 ## Speed tables
@@ -346,14 +351,11 @@ speeds <- sapply(bins, function(x) {
 avgs <- sapply(speeds, mean)
 ```
 
+## Average Speed Correllations
 Average speed of cars per road across time
 
 Correlation of average speeds between roads
-
-## Average Speed Graph
-
-## Ringroad Heatmap
-
+  
 # Inferential analysis
 
 # And beyond..
