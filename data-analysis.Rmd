@@ -366,7 +366,10 @@ roadAnalysis <- function(segments, L = left_boundary, R = right_boundary) {
   names(dframe) <- 1:9
   dmatrix <- data.matrix(dframe)
   #hmap <- heatmap(dmatrix, Rowv=NA, Colv=NA, col = heat.colors(256), scale="column", margins=c(5,10))
-  return(ggplot(melt(dmatrix), aes(Var2, Var1, fill = value)) + geom_raster())
+  return(
+    ggplot(melt(dmatrix), aes(Var2, Var1, fill = value)) + 
+      geom_raster() + 
+      scale_fill_continuous(na.value = 'steelblue'))
 }
 ```
 
