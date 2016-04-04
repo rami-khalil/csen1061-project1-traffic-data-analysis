@@ -308,7 +308,7 @@ plot(sizes, type = "l")
 
 We can now see some app usage patterns across weekdays and weekends.
 
-# Isolated Analysis Procedure
+## Isolated Analysis Procedure
 
 Even though our data fits in memory, we have a plethora of information. Traffic flow data, even when only recorded sparsely for a couple of cities over two weeks, represents the ongoings of a very complex system with many intricacies that can not be summed up in a few global metrics. Therefore, we will carry out small practical analyses by isolating road segments.
 
@@ -344,7 +344,6 @@ roadAnalysis <- function(segments, L = left_boundary, R = right_boundary) {
   
   dframe <- bind_rows(subs)
   dframe <- dframe[, as.character(segments)]
-  print(head(dframe))
   row.names(dframe) <- names(subs)
   names(dframe) <- 1:9
 
@@ -358,20 +357,16 @@ speedSegmentTimePlot <- function(dmatrix, segments) {
   
   return(
     ggplot(melt(dmatrix), aes(Var2, Var1, fill = value)) + 
-      labs(x = "Segment", y = "Time") +
+      labs(x = "Segment", y = "Time", fill = "Avg. Km/h") +
       scale_x_continuous(breaks = 1:length(ord), labels = ord) +
       theme(axis.text.x = element_text(angle = 70, vjust = 0.5)) +
-      geom_raster(interpolate = TRUE)
+      geom_raster(interpolate = TRUE) +
+      #scale_fill_gradientn(colours=c("#FF0000FF", "#00FF00FF", "#99FF00FF"))
+      scale_fill_gradientn(
+        colours=c("#DD2C2C", "#CE8827", "#DDD777", "#82C972", "#459B1A"),
+        breaks = c(5, 15, 30, 60, 85))
   )
 }
-
-ring_road       <- c(31, 282, 318, 317, 301, 284, 283, 121, 126)
-
-roadAnalysis(
-  ring_road,
-  as.POSIXct(strptime("2016-02-07 04:00:00", "%F %X"), tz = "UTC"),
-  as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC")) %>%
-  speedSegmentTimePlot(ring_road)
 ```
 
 ## The Ring Road
