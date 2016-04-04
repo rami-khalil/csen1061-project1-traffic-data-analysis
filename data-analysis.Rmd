@@ -9,6 +9,12 @@ library(dplyr)
 library(knitr)
 library(tidyr)
 library(reshape2)
+library(chron)
+
+getmode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
 ```
 
 # Data Processing
@@ -384,7 +390,7 @@ ID   |   Segment
 286  |             Zera3y To Me7war
 122  |   Me7war To Waslet Maryoutia
 125  |   Waslet Maryoutia To Moneeb
----  |    **Opposite Direction**   
+---  |    **Opposite Direction**
 126  |   Moneeb To Waslet Maryoutia
 121  |   Waslet Maryoutia To Me7war
 283  |             Me7war To Zera3y
@@ -432,6 +438,64 @@ roadAnalysis(
 ```
 
 ## Travel speeds central tendencies and spreads
+
+Let's carry out a different form of focused analysis on another road segment. First, we will need to differentiate between reports made on weekends and those made on weekdays. Then, we will combine the samples by the hours they were reported on in order to calculate an estimate of the true mean of travel speed at a given hour.
+
+```{r}
+data.speed <- data.speed %>%
+  filter(speed < 150) # filter outliers (insane people/bugged reports)
+
+data.speed$weekend <- data.speed$report_time %>% weekdays() %in% c("Friday", "Saturday")
+data.speed$report_hour <- data.speed$report_time %>% hours() %>% factor(levels = 0:23, labels = 0:23)
+
+average_speeds <- data.speed %>%
+  group_by(road, weekend, report_hour) %>%
+  summarise(mean = mean(speed), sd = sd(speed), median = median(speed), mode = getmode(speed), count = n()) %>%
+  ungroup()
+
+average_speeds %>%
+  sample_n(size = 15) %>%
+  kable()
+```
+
+In the spirit of focusing our analyses on single segments or cohesive sets of roads, let us take an excursion into the distribution of travel speeds on the following road segment represented by the following two road ids:
+
+ID   |   Segment
+---- | -----------------------------------
+167  |  Ta7rir To Mohandesin
+164  |  Mohandesin To Ta7rir
+
+### Workdays
+
+```{r}
+data.speed %>%
+  filter(road == 167, weekend == FALSE) %>% (function(x) {
+  #boxplot(speed~report_hour, x, main = "Travel Speed Data", ylab = "Km/h", xlab = "Hour of day")
+  qplot(report_hour, speed, data = x, geom = c("boxplot"))})
+```
+
+```{r}
+data.speed %>%
+  filter(road == 164, weekend == FALSE) %>% (function(x) {
+  #boxplot(speed~report_hour, x, main = "Travel Speed Data", ylab = "Km/h", xlab = "Hour of day")
+  qplot(report_hour, speed, data = x, geom = c("boxplot"))})
+```
+
+### Weekends
+
+```{r}
+data.speed %>%
+  filter(road == 167, weekend == TRUE) %>% (function(x) {
+  #boxplot(speed~report_hour, x, main = "Travel Speed Data", ylab = "Km/h", xlab = "Hour of day")
+  qplot(report_hour, speed, data = x, geom = c("boxplot"))})
+```
+
+```{r}
+data.speed %>%
+  filter(road == 164, weekend == TRUE) %>% (function(x) {
+  #boxplot(speed~report_hour, x, main = "Travel Speed Data", ylab = "Km/h", xlab = "Hour of day")
+  qplot(report_hour, speed, data = x, geom = c("boxplot"))})
+```
 
 ## Identifying key bottleneck points
 
