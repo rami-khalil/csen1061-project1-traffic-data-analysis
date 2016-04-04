@@ -454,11 +454,12 @@ average_speeds <- data.speed %>%
   ungroup()
 
 average_speeds %>%
+  filter(count > 1) %>%
   sample_n(size = 15) %>%
   kable()
 ```
 
-In the spirit of focusing our analyses on single segments or cohesive sets of roads, let us take an excursion into the distribution of travel speeds on the following road segment represented by the following two road ids:
+In the spirit of focusing our analyses on single segments or cohesive sets of roads, let us take an excursion into the distribution of travel speeds on the two following 6th of October Bridge road segments:
 
 ID   |   Segment
 ---- | -----------------------------------
@@ -470,15 +471,11 @@ ID   |   Segment
 ```{r}
 data.speed %>%
   filter(road == 167, weekend == FALSE) %>% (function(x) {
-  #boxplot(speed~report_hour, x, main = "Travel Speed Data", ylab = "Km/h", xlab = "Hour of day")
-  qplot(report_hour, speed, data = x, geom = c("boxplot"))})
-```
+  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Ta7rir To Mohandesin")})
 
-```{r}
 data.speed %>%
   filter(road == 164, weekend == FALSE) %>% (function(x) {
-  #boxplot(speed~report_hour, x, main = "Travel Speed Data", ylab = "Km/h", xlab = "Hour of day")
-  qplot(report_hour, speed, data = x, geom = c("boxplot"))})
+  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Mohandesin To Ta7rir")})
 ```
 
 ### Weekends
@@ -486,36 +483,44 @@ data.speed %>%
 ```{r}
 data.speed %>%
   filter(road == 167, weekend == TRUE) %>% (function(x) {
-  #boxplot(speed~report_hour, x, main = "Travel Speed Data", ylab = "Km/h", xlab = "Hour of day")
-  qplot(report_hour, speed, data = x, geom = c("boxplot"))})
+  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Ta7rir To Mohandesin")})
 ```
 
 ```{r}
 data.speed %>%
   filter(road == 164, weekend == TRUE) %>% (function(x) {
-  #boxplot(speed~report_hour, x, main = "Travel Speed Data", ylab = "Km/h", xlab = "Hour of day")
-  qplot(report_hour, speed, data = x, geom = c("boxplot"))})
+  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Mohandesin To Ta7rir")})
 ```
+
+### Q-Q Plots
+
+It is convenient and reasonable to assume that weekday and weekend speed distributions are different, but let's try to confirm that assumption using our data.
+
+```{r}
+qqplot(
+  data.speed[data.speed$road == 167 & data.speed$weekend == TRUE, "speed"],
+  data.speed[data.speed$road == 167 & data.speed$weekend == FALSE, "speed"],
+  ylab = "Weekday Distribution",
+  xlab = "Weekend Distribution",
+  main = "Ta7rir To Mohandesin"
+)
+qqline(
+  data.speed[data.speed$road == 164 & data.speed$weekend == TRUE, "speed"],
+  data.speed[data.speed$road == 164 & data.speed$weekend == FALSE, "speed"],
+  ylab = "Weekday Distribution",
+  xlab = "Weekend Distribution",
+  main = "Mohandesin To Ta7rir"
+)
+```
+
+It results from the above two Q-Q plots that for both directions of the 6th of october segment, the weekend measurements and the weekday measurements follow two different distributions and exhibit different tail behavior.
 
 ## Identifying key bottleneck points
 
-## Speed tables
-
-```{r}
-speeds <- sapply(bins, function(x) {
-    select(x, speed)
-  })
-avgs <- sapply(speeds, mean)
-```
-
 ## Average Speed Correllations
-
-Average speed of cars per road across time
 
 Correlation of average speeds between roads
 
-
-  
 # Inferential analysis
 
 # And beyond..
