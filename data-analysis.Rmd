@@ -369,7 +369,7 @@ speedSegmentTimePlot <- function(dmatrix, segments) {
 }
 ```
 
-## The Ring Road
+## Isolated Analysis - The Ring Road
 
 The ring road is the major highway in Cairo. Bey2ollak segments it into the following parts:
 
@@ -431,6 +431,10 @@ roadAnalysis(
   speedSegmentTimePlot(ring_road_ccw)
 ```
 
+## Travel speeds central tendencies and spreads
+
+## Identifying key bottleneck points
+
 ## Speed tables
 
 ```{r}
@@ -441,9 +445,12 @@ avgs <- sapply(speeds, mean)
 ```
 
 ## Average Speed Correllations
+
 Average speed of cars per road across time
 
 Correlation of average speeds between roads
+
+
   
 # Inferential analysis
 
@@ -451,20 +458,6 @@ Correlation of average speeds between roads
 
 ```{r}
 glimpse(data.road)
+glimpse(data.speed)
+glimpse(data.road_names)
 ```
-
-rd.rp.cmid is the id of the comment. ri is the road id. img is the user profile image id, rpImg is the id of the image attached to the report if any. strq, I guess, refers to street request? it appears any road with only one direction or segment has this set to zero, while the others are set to one. cmrq might refer to comment request?
-
-rd.rp.stid:
-1   7alawa :D 80+
-2   lazeez  :) 40-79
-3   mashy :| 20-39
-4   za7ma  :( 10-19
-5   mafeesh 2amal :'( 9-
-6   so2al ?
-7   khatar X
-8   7adsa =:=
-9   3otl /\
-10  ba2olak eh !
-
-rd.stid:
