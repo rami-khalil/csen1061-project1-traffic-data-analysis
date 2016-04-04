@@ -308,33 +308,9 @@ plot(sizes, type = "l")
 
 We can now see some app usage patterns across weekdays and weekends.
 
-# The Ring Road
+# Isolated Analysis Procedure
 
-Even though our data fits in memory, we have a plethora of information. Traffic flow data, even when only recorded sparsely for a couple of cities over two weeks, represents the ongoings of a very complex system with many intricacies that can not be summed up in a few global metrics. Therefore, we will carry out a small practical analysis by isolating the ring road data, which forms a cohesive road that can be meshed together and examined for speed patterns.
-
-ID   |   Segment
----- | ------------------------------
-32   |          Moneeb To Autostrad
-281  |     Autostrad To Sokhna Exit
-315  |       Sokhna Exit To Tagamo3
-316  |          Tagamo3 To Suez Rd.
-302  |    Suez Rd. To Nafa2 ElSalam
-285  |      Nafa2 ElSalam To Zera3y
-286  |             Zera3y To Me7war
-122  |   Me7war To Waslet Maryoutia
-125  |   Waslet Maryoutia To Moneeb
----  |    **Opposite Direction**   
-126  |   Moneeb To Waslet Maryoutia
-121  |   Waslet Maryoutia To Me7war
-283  |             Me7war To Zera3y
-284  |      Zera3y To Nafa2 ElSalam
-301  |    Nafa2 ElSalam To Suez Rd.
-317  |          Suez Rd. To Tagamo3
-318  |       Tagamo3 To Sokhna Exit
-282  |     Sokhna Exit To Autostrad
- 31  |          Autostrad To Moneeb
-
-We will now define the analysis procedure that is to be carried out on both directions of the ring road. We have already checked the filtered data for consistency across the selected time period and acceptable results were found.
+Even though our data fits in memory, we have a plethora of information. Traffic flow data, even when only recorded sparsely for a couple of cities over two weeks, represents the ongoings of a very complex system with many intricacies that can not be summed up in a few global metrics. Therefore, we will carry out small practical analyses by isolating road segments.
 
 ```{r}
 ring_road     <- c(31, 282, 318, 317, 301, 284, 283, 121, 126)
@@ -376,24 +352,63 @@ roadAnalysis <- function(segments, L = left_boundary, R = right_boundary) {
   #hmap <- heatmap(dmatrix, Rowv=NA, Colv=NA, col = heat.colors(256), scale="column", margins=c(5,10))
   return(
     ggplot(melt(dmatrix), aes(Var2, Var1, fill = value)) + 
-      geom_raster(interpolate = TRUE) + 
-      scale_fill_continuous(na.value = 'steelblue'))
-}
+      geom_raster(interpolate = TRUE)# + 
+      #scale_fill_continuous(na.value = 'steelblue')
+    )}
 ```
 
-### Clockwise
+## The Ring Road
+
+The ring road is the major highway in Cairo. Bey2ollak segments it into the following parts:
+
+ID   |   Segment
+---- | ------------------------------
+32   |          Moneeb To Autostrad
+281  |     Autostrad To Sokhna Exit
+315  |       Sokhna Exit To Tagamo3
+316  |          Tagamo3 To Suez Rd.
+302  |    Suez Rd. To Nafa2 ElSalam
+285  |      Nafa2 ElSalam To Zera3y
+286  |             Zera3y To Me7war
+122  |   Me7war To Waslet Maryoutia
+125  |   Waslet Maryoutia To Moneeb
+---  |    **Opposite Direction**   
+126  |   Moneeb To Waslet Maryoutia
+121  |   Waslet Maryoutia To Me7war
+283  |             Me7war To Zera3y
+284  |      Zera3y To Nafa2 ElSalam
+301  |    Nafa2 ElSalam To Suez Rd.
+317  |          Suez Rd. To Tagamo3
+318  |       Tagamo3 To Sokhna Exit
+282  |     Sokhna Exit To Autostrad
+ 31  |          Autostrad To Moneeb
+
+Let's examine the speed patterns across place and time for the ring road.
+
+### Clockwise direction
 
 ```{r}
 roadAnalysis(
   ring_road,
   as.POSIXct(strptime("2016-02-07 04:00:00", "%F %X"), tz = "UTC"),
-  as.POSIXct(strptime("2016-02-09 04:00:00", "%F %X"), tz = "UTC"))
+  as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC"))
+roadAnalysis(
+  ring_road,
+  as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC"),
+  as.POSIXct(strptime("2016-02-21 04:00:00", "%F %X"), tz = "UTC"))
 ```
 
-### Counter-clockwise
+### Counter-clockwise direction
 
 ```{r}
-roadAnalysis(ring_road_ccw)
+roadAnalysis(
+  ring_road_ccw,
+  as.POSIXct(strptime("2016-02-07 04:00:00", "%F %X"), tz = "UTC"),
+  as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC"))
+roadAnalysis(
+  ring_road_ccw,
+  as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC"),
+  as.POSIXct(strptime("2016-02-21 04:00:00", "%F %X"), tz = "UTC"))
 ```
 
 ## Speed tables
