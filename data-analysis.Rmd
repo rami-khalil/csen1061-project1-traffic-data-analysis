@@ -9,9 +9,13 @@ This document details the statistical analysis of traffice data collected from B
 
 ## Metrics of focus
 
-## Descriptive insights
+After the data was explored and cleaned, it was refined into only a few metrics: the road on which a report was made, the time a report was made, and the estimated average travel speed of the reporter. The analyses presented in this report mainly focus on these metrics and some of their derivatives such as the hour of day in the report and whether the report was made on a weekend.
 
-## Key inferences
+## Descriptive means
+
+The metrics extracted from the data convey a great deal of time variant information about a complex network of traffic flow. In order to deliver any significant or actionable information about the data within the scope of basic statistical methods, narrowly focused descriptive analyses were carried out on selected road segments. A heatmap was used to describe the average travel speed patterns of the Ring Road in Cairo and appeared to deliver acceptable insight and highlight some reasonable patterns. Travel speeds across a segment of the 6th of October bridge were represented across time by a series of boxplots. This was useful in conveying some of the missing information in the heatmap, such as the variability of the speed measurements. Finally, Q-Q plots were used to answer the age old adage that traffic on the weekends is different from traffic on weekdays.
+
+## Inferential methodologies
 
 # Data Processing
 
@@ -320,11 +324,11 @@ sizes <- sapply(bins, nrow)
 plot(sizes, type = "l")
 ```
 
-We can now see some app usage patterns across weekdays and weekends.
+We can now see the distribution of our data across our chosen timespan.
 
 ## Isolated Analysis Procedure
 
-Even though our data fits in memory, we have a plethora of information. Traffic flow data, even when only recorded sparsely for a couple of cities over two weeks, represents the ongoings of a very complex system with many intricacies that can not be summed up in a few global metrics. Therefore, we will carry out small practical analyses by isolating road segments.
+Even though our data fits in memory, we have a plethora of information. Traffic flow data, even when only recorded sparsely for a couple of cities over two weeks, represents the ongoings of a very complex system with many intricacies that can not be easily summarized globaly. Therefore, we will carry out small practical analyses by isolating road segments to demonstrate how the data describes the traffic flow in some streets.
 
 ```{r}
 roadAnalysis <- function(segments, L = left_boundary, R = right_boundary) {
@@ -413,7 +417,7 @@ ring_road     <- c(31, 282, 318, 317, 301, 284, 283, 121, 126)
 ring_road_ccw <- c(32, 281, 315, 316, 302, 285, 286, 122, 125)
 ```
 
-Let's examine the speed patterns across place and time for the ring road.
+Let's examine the speed patterns across place and time for the ring road using a visual heatmap of the average travel speeds that we calculated.
 
 ### Week One
 
@@ -429,6 +433,8 @@ roadAnalysis(
   as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC")) %>%
   speedSegmentTimePlot(ring_road_ccw)
 ```
+
+We can see how nicely morning congestion in some counter-clockwise segments is complemented in the afternoon in the clock-wise segments. We will withhold from making any generalizations here and only keep to highlighting how informative and intuitive the above heatmap is when it comes to conveying information about our data.
 
 ### Week Two
 
@@ -447,7 +453,7 @@ roadAnalysis(
 
 ## Travel speeds central tendencies and spreads
 
-Let's carry out a different form of focused analysis on another road segment. First, we will need to differentiate between reports made on weekends and those made on weekdays. Then, we will combine the samples by the hours they were reported on in order to calculate an estimate of the true mean of travel speed at a given hour.
+Let's carry out a different form of focused analysis on another road segment. First, we will need to differentiate between reports made on weekends and those made on weekdays. Then, we will combine the samples by the hours they were reported on in order to calculate some summaries about travel speed at a given street and time.
 
 ```{r}
 data.speed <- data.speed %>%
@@ -467,7 +473,7 @@ average_speeds %>%
   kable()
 ```
 
-In the spirit of focusing our analyses on single segments or cohesive sets of roads, let us take an excursion into the distribution of travel speeds on the two following 6th of October Bridge road segments:
+In the spirit of focusing our analyses on single segments or cohesive sets of roads, let us take an excursion into the distribution of travel speeds on the two directions of a 6th of October Bridge road segment:
 
 ID   |   Segment
 ---- | -----------------------------------
@@ -498,11 +504,11 @@ data.speed %>%
 
 ### Interpretation
 
-The box plots above convey some interesting information about the distribution of travel speeds across time. For example, people travelling from Ta7rir to Mohandesin on a weekday between 3PM and 7PM exhibit low average travel speeds that are mainly distributed around 25 km/h.
+The box plots above convey some interesting information about the distribution of travel speeds across time that were not properly conveyed by our heatmap. For example, people travelling from Ta7rir to Mohandesin on a weekday between 3PM and 7PM exhibit low average travel speeds that are mainly distributed around 25 km/h. What's new here is the information of the spread of our measurements.
 
-### Weekdays VS Weekends
+## Comparing Distributions: Weekdays VS Weekends
 
-It is convenient and reasonable to guess from the plots above that weekday and weekend speed distributions are different. Let's try to confirm that assumption using our data.
+It is easy to guess from the plots above that weekday and weekend average speed measurements have different distributions. Let's explore how the two distributions compare using our data from the bridge segment.
 
 ```{r, fig.show='hold'}
 qqplot(
@@ -521,20 +527,8 @@ qqplot(
 )
 ```
 
-It results from the above two Q-Q plots that for both directions of the 6th of october segment, the weekend measurements and the weekday measurements follow two different distributions and exhibit different tail behavior.
-
-## Identifying key bottleneck points
-
-## Average Speed Correlations
-
-Correlation of average speeds between roads
+The above two Q-Q plots show that for both directions of the 6th of october bridge segment the weekend measurements and the weekday measurements follow two different distributions that exhibit different tail behavior. If the two distributions were similar, our plots would have a straight line shape.
 
 # Inferential analyses
 
-# And beyond..
 
-```{r}
-glimpse(data.road)
-glimpse(data.speed)
-glimpse(data.road_names)
-```
