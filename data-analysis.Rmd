@@ -3,7 +3,19 @@ title: Traffic Data Analysis
 output: html_document
 ---
 
-```{r}
+# Preamble
+
+This document details the statistical analysis of traffice data collected from Bey2ollak.com. The data is first cleaned and processed to extract key traffice flow metrics. Then a stage of basic descriptive statistical analysis is undergone whereby various means of describing the data are attempted in order to empirically determine what are some meaningful methods of describing the data. Afterwards, some rudimentary inferential statistics is applied to answer some hypotheses about our metrics.
+
+## Metrics of focus
+
+## Descriptive insights
+
+## Key inferences
+
+# Data Processing
+
+```{r, echo=FALSE}
 library(ggplot2)
 library(dplyr)
 library(knitr)
@@ -16,8 +28,6 @@ getmode <- function(v) {
    uniqv[which.max(tabulate(match(v, uniqv)))]
 }
 ```
-
-# Data Processing
 
 ## Initialization
 
@@ -277,7 +287,7 @@ data.speed <- data.road %>%
   unique()
 ```
 
-# Descriptive analysis
+# Descriptive analyses
 
 We are now left with a clean set of observations of approximate average travel speeds across different roads at different times.
 
@@ -303,9 +313,7 @@ left_boundary <- as.POSIXct(strptime("2016-02-07 04:00:00", "%F %X"), tz = "UTC"
 right_boundary <- as.POSIXct(strptime("2016-02-21 04:00:00", "%F %X"), tz = "UTC")
 data.speed <- data.speed %>%
   filter(report_time >= left_boundary, report_time < right_boundary)
-```
 
-```{r}
 bins <- data.speed %>%
   split(cut(data.speed$report_time, "hour"))
 sizes <- sapply(bins, nrow)
@@ -400,36 +408,36 @@ ID   |   Segment
 318  |       Tagamo3 To Sokhna Exit
 282  |     Sokhna Exit To Autostrad
  31  |          Autostrad To Moneeb
+```{r}
+ring_road     <- c(31, 282, 318, 317, 301, 284, 283, 121, 126)
+ring_road_ccw <- c(32, 281, 315, 316, 302, 285, 286, 122, 125)
+```
 
 Let's examine the speed patterns across place and time for the ring road.
 
-### Clockwise direction
+### Week One
 
-```{r fig.width=12, fig.height=10}
-ring_road     <- c(31, 282, 318, 317, 301, 284, 283, 121, 126)
-
+```{r fig.width=12, fig.height=10, fig.show='hold'}
 roadAnalysis(
   ring_road,
   as.POSIXct(strptime("2016-02-07 04:00:00", "%F %X"), tz = "UTC"),
   as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC")) %>%
   speedSegmentTimePlot(ring_road)
-roadAnalysis(
-  ring_road,
-  as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC"),
-  as.POSIXct(strptime("2016-02-21 04:00:00", "%F %X"), tz = "UTC")) %>%
-  speedSegmentTimePlot(ring_road)
-```
-
-### Counter-clockwise direction
-
-```{r fig.width=12, fig.height=10}
-ring_road_ccw <- c(32, 281, 315, 316, 302, 285, 286, 122, 125)
-
 roadAnalysis(
   ring_road_ccw,
   as.POSIXct(strptime("2016-02-07 04:00:00", "%F %X"), tz = "UTC"),
   as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC")) %>%
   speedSegmentTimePlot(ring_road_ccw)
+```
+
+### Week Two
+
+```{r fig.width=12, fig.height=10, fig.show='hold'}
+roadAnalysis(
+  ring_road,
+  as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC"),
+  as.POSIXct(strptime("2016-02-21 04:00:00", "%F %X"), tz = "UTC")) %>%
+  speedSegmentTimePlot(ring_road)
 roadAnalysis(
   ring_road_ccw,
   as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC"),
@@ -466,37 +474,37 @@ ID   |   Segment
 167  |  Ta7rir To Mohandesin
 164  |  Mohandesin To Ta7rir
 
-### Workdays
+### 6th of October Bridge: Ta7rir To Mohandesin
 
-```{r}
+```{r, fig.show='hold'}
 data.speed %>%
   filter(road == 167, weekend == FALSE) %>% (function(x) {
-  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Ta7rir To Mohandesin")})
-
-data.speed %>%
-  filter(road == 164, weekend == FALSE) %>% (function(x) {
-  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Mohandesin To Ta7rir")})
-```
-
-### Weekends
-
-```{r}
+  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Ta7rir To Mohandesin (Weekdays)")})
 data.speed %>%
   filter(road == 167, weekend == TRUE) %>% (function(x) {
-  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Ta7rir To Mohandesin")})
+  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Ta7rir To Mohandesin (Weekends)")})
 ```
 
-```{r}
+### 6th of October Bridge: Mohandesin To Ta7rir
+
+```{r, fig.show='hold'}
+data.speed %>%
+  filter(road == 164, weekend == FALSE) %>% (function(x) {
+  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Mohandesin To Ta7rir (Weekdays)")})
 data.speed %>%
   filter(road == 164, weekend == TRUE) %>% (function(x) {
-  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Mohandesin To Ta7rir")})
+  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Mohandesin To Ta7rir (Weekends)")})
 ```
 
-### Q-Q Plots
+### Interpretation
 
-It is convenient and reasonable to assume that weekday and weekend speed distributions are different, but let's try to confirm that assumption using our data.
+The box plots above convey some interesting information about the distribution of travel speeds across time. For example, people travelling from Ta7rir to Mohandesin on a weekday between 3PM and 7PM exhibit low average travel speeds that are mainly distributed around 25 km/h.
 
-```{r}
+### Weekdays VS Weekends
+
+It is convenient and reasonable to guess from the plots above that weekday and weekend speed distributions are different. Let's try to confirm that assumption using our data.
+
+```{r, fig.show='hold'}
 qqplot(
   data.speed[data.speed$road == 167 & data.speed$weekend == TRUE, "speed"],
   data.speed[data.speed$road == 167 & data.speed$weekend == FALSE, "speed"],
@@ -504,7 +512,7 @@ qqplot(
   xlab = "Weekend Distribution",
   main = "Ta7rir To Mohandesin"
 )
-qqline(
+qqplot(
   data.speed[data.speed$road == 164 & data.speed$weekend == TRUE, "speed"],
   data.speed[data.speed$road == 164 & data.speed$weekend == FALSE, "speed"],
   ylab = "Weekday Distribution",
@@ -517,11 +525,11 @@ It results from the above two Q-Q plots that for both directions of the 6th of o
 
 ## Identifying key bottleneck points
 
-## Average Speed Correllations
+## Average Speed Correlations
 
 Correlation of average speeds between roads
 
-# Inferential analysis
+# Inferential analyses
 
 # And beyond..
 
