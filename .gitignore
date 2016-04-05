@@ -1,10 +1,9 @@
 # History files
 .Rhistory
 .Rapp.history
-.workspace
 
 # Session Data files
-.RData
+**.RData
 
 # General data
 **.csv
