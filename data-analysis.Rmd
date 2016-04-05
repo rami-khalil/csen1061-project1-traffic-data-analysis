@@ -17,6 +17,8 @@ The metrics extracted from the data convey a great deal of time variant informat
 
 ## Inferential methodologies
 
+
+
 # Data Processing
 
 ```{r, echo=FALSE}
