@@ -561,7 +561,21 @@ data.means <- data.central %>%
   mutate(
     error = (qt(0.975, df = sample_size - 1)*sample_sd)/sqrt(sample_size),
     lower = sample_mean - error,
-    upper = sample_mean + error)
+    upper = sample_mean + error) %>%
+  select(-c(sample_sd, sample_size))
+```
+
+Let's use this to examine the estimated means for congestion on a segment from the ring road during workdays:
+
+```{r}
+data.means %>%
+  filter(road == 317, weekend == FALSE) %>% (function(x) {
+    ggplot(x, aes(x = report_hour, y = sample_mean)) + 
+      geom_errorbar(aes(ymin=lower, ymax=upper), width=.1) +
+      geom_point()}) +
+      ggtitle("Da2ery, Suez Rd. To Tagamo3: Estimated congestion means within 95% confidence intervals") +
+      ylab("Estimated mean") +
+      xlab("Hour of day")
 ```
 
 ## Hypothesis: 
