@@ -214,7 +214,7 @@ rm(rpt_dupes)
 
 We will now attempt to extrapolate travel speeds so we can use them as the main metric later on in our analysis.
 
-First, we will note that bey2ollak's auto report feature uses the following categorization for speed ranges:
+First, we will assume the following categorization for speed ranges:
 
 Classification  | Speed Range  | rd.rp.stid 
 --------------- | ------------ | -----------
@@ -244,22 +244,11 @@ data.road <- data.road %>%
 data.road %>% nrow()
 ```
 
-We will proceed to initially use the above classifications to approximate the value of a new column we will introduce which will represent average travel speed.
+The automatic reporter produces templated comments containing our desired values. We can use these to populate a new speed column.
 
 ```{r}
 data.road <- data.road %>%
   mutate(speed = NA)
-data.road$speed[data.road$rd.rp.stid == 1] <- 85
-data.road$speed[data.road$rd.rp.stid == 2] <- 60
-data.road$speed[data.road$rd.rp.stid == 3] <- 30
-data.road$speed[data.road$rd.rp.stid == 4] <- 15
-data.road$speed[data.road$rd.rp.stid == 5] <- 5
-data.road %>% select(speed) %>% is.na() %>% sum()
-```
-
-The automatic reporter produces templated comments containing our desired values. We can use these to fine tune our speed column values.
-
-```{r}
 regexp <- "(\\d+ km/h)|(\\d+ كم/س)"
 matched <- grepl(regexp, data.road$rd.rp.cm)
 
@@ -271,31 +260,48 @@ data.road$speed[matched] <- gsub("\\D", " ", matches) %>%
   as.integer()
 
 rm(regexp, matched, subs, matches)
+```
 
-data.road %>% select(speed) %>% is.na() %>% sum()
+We will proceed to use the above speeds to approximate the missing road status values.
+
+```{r}
+target_rows <- (data.road$rd.rp.stid > 5) & !(data.road$speed %>% is.na())
+
+score_4 <- target_rows & data.road$speed > 9
+score_3 <- target_rows & data.road$speed > 19
+score_2 <- target_rows & data.road$speed > 39
+score_1 <- target_rows & data.road$speed > 79
+
+data.road$rd.rp.stid[target_rows] <- 5
+data.road$rd.rp.stid[score_4] <- 4
+data.road$rd.rp.stid[score_3] <- 3
+data.road$rd.rp.stid[score_2] <- 2
+data.road$rd.rp.stid[score_1] <- 1
+
+(data.road$rd.rp.stid > 5) %>% sum()
 ```
 
 Now we can isolate "ba2ollak eh" reports that do not contain any speed information. Furthermore, as the remaining NA values are randomly distributed across report_times, and are small in quantity relative to the remaining observation count, we will discard them.
 
 ```{r}
 data.info <- data.road %>%
-  filter(rd.rp.stid == 10 & is.na(speed))
+  filter(rd.rp.stid == 10)
 data.road <- data.road %>%
-  filter(!is.na(speed))
+  filter(rd.rp.stid <= 5)
 ```
 
-## Isolating Speed Reports
+## Isolating Congestion Data
 
 ```{r}
 data.speed <- data.road %>%
-  select(rd.ri, rd.rp.cmid, report_time, speed) %>%
-  rename(road = rd.ri, comment = rd.rp.cmid) %>%
+  select(rd.ri, rd.rp.cmid, report_time, rd.rp.stid) %>%
+  rename(road = rd.ri, comment = rd.rp.cmid, congestion = rd.rp.stid) %>%
   unique()
 ```
 
 # Descriptive analyses
 
-We are now left with a clean set of observations of approximate average travel speeds across different roads at different times.
+We are now left with a clean set of observations of congestion levels across different roads at different times.
 
 ```{r}
 glimpse(data.speed)
@@ -344,7 +350,7 @@ roadAnalysis <- function(segments, L = left_boundary, R = right_boundary) {
     tmp <- bin %>% 
       filter(road %in% segments) %>% 
       group_by(road) %>% 
-      summarise(avg_spd = mean(speed))
+      summarise(avg_spd = mean(congestion))
     
     ord <- tmp[order(factor(tmp$road, levels = segments)),]
     
@@ -377,14 +383,20 @@ speedSegmentTimePlot <- function(dmatrix, segments) {
   
   return(
     ggplot(melt(dmatrix), aes(Var2, Var1, fill = value)) + 
-      labs(x = "Segment", y = "Time", fill = "Avg. Km/h") +
+      labs(x = "Segment", y = "Time", fill = "Avg. Congestion") +
       scale_x_continuous(breaks = 1:length(ord), labels = ord) +
       theme(axis.text.x = element_text(angle = 70, vjust = 0.5)) +
       geom_raster(interpolate = TRUE) +
       #scale_fill_gradientn(colours=c("#FF0000FF", "#00FF00FF", "#99FF00FF"))
       scale_fill_gradientn(
-        colours=c("#DD2C2C", "#CE8827", "#DDD777", "#82C972", "#459B1A"),
-        breaks = c(5, 15, 30, 60, 85))
+        #colours=c("#DD2C2C", "#CE8827", "#DDD777", "#82C972", "#459B1A"),
+        colours=c(
+          "#459B1A",
+          "#82C972",
+          "#DDD777",
+          "#CE8827",
+          "#DD2C2C"),
+        breaks = c(1, 2, 3, 4, 5))
   )
 }
 ```
@@ -419,7 +431,7 @@ ring_road     <- c(31, 282, 318, 317, 301, 284, 283, 121, 126)
 ring_road_ccw <- c(32, 281, 315, 316, 302, 285, 286, 122, 125)
 ```
 
-Let's examine the speed patterns across place and time for the ring road using a visual heatmap of the average travel speeds that we calculated.
+Let's examine the congestion patterns across place and time for the ring road using a visual heatmap of the average congestion that we calculated.
 
 ### Week One
 
@@ -453,20 +465,22 @@ roadAnalysis(
   speedSegmentTimePlot(ring_road_ccw)
 ```
 
-## Travel speeds central tendencies and spreads
+## Congestion levels central tendencies and spreads
 
-Let's carry out a different form of focused analysis on another road segment. First, we will need to differentiate between reports made on weekends and those made on weekdays. Then, we will combine the samples by the hours they were reported on in order to calculate some summaries about travel speed at a given street and time.
+Let's carry out a different form of focused analysis on another road segment. First, we will need to differentiate between reports made on weekends and those made on weekdays. Then, we will combine the samples by the hours they were reported on in order to calculate some summaries about congestion at a given street and time.
 
 ```{r}
-data.speed <- data.speed %>%
-  filter(speed < 150) # filter outliers (insane people/bugged reports)
-
 data.speed$weekend <- data.speed$report_time %>% weekdays() %in% c("Friday", "Saturday")
 data.speed$report_hour <- data.speed$report_time %>% hours() %>% factor(levels = 0:23, labels = 0:23)
 
 average_speeds <- data.speed %>%
   group_by(road, weekend, report_hour) %>%
-  summarise(mean = mean(speed), sd = sd(speed), median = median(speed), mode = getmode(speed), count = n()) %>%
+  summarise(
+    mean = mean(congestion),
+    sd = sd(congestion),
+    median = median(congestion),
+    mode = getmode(congestion),
+    count = n()) %>%
   ungroup()
 
 average_speeds %>%
@@ -487,10 +501,10 @@ ID   |   Segment
 ```{r, fig.show='hold'}
 data.speed %>%
   filter(road == 167, weekend == FALSE) %>% (function(x) {
-  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Ta7rir To Mohandesin (Weekdays)")})
+  qplot(report_hour, congestion, data = x, geom = c("boxplot"), main = "Ta7rir To Mohandesin (Weekdays)")})
 data.speed %>%
   filter(road == 167, weekend == TRUE) %>% (function(x) {
-  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Ta7rir To Mohandesin (Weekends)")})
+  qplot(report_hour, congestion, data = x, geom = c("boxplot"), main = "Ta7rir To Mohandesin (Weekends)")})
 ```
 
 ### 6th of October Bridge: Mohandesin To Ta7rir
@@ -498,31 +512,31 @@ data.speed %>%
 ```{r, fig.show='hold'}
 data.speed %>%
   filter(road == 164, weekend == FALSE) %>% (function(x) {
-  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Mohandesin To Ta7rir (Weekdays)")})
+  qplot(report_hour, congestion, data = x, geom = c("boxplot"), main = "Mohandesin To Ta7rir (Weekdays)")})
 data.speed %>%
   filter(road == 164, weekend == TRUE) %>% (function(x) {
-  qplot(report_hour, speed, data = x, geom = c("boxplot"), main = "Mohandesin To Ta7rir (Weekends)")})
+  qplot(report_hour, congestion, data = x, geom = c("boxplot"), main = "Mohandesin To Ta7rir (Weekends)")})
 ```
 
 ### Interpretation
 
-The box plots above convey some interesting information about the distribution of travel speeds across time that were not properly conveyed by our heatmap. For example, people travelling from Ta7rir to Mohandesin on a weekday between 3PM and 7PM exhibit low average travel speeds that are mainly distributed around 25 km/h. What's new here is the information of the spread of our measurements.
+The box plots above convey some interesting information about the distribution of congestion across time that were not properly conveyed by our heatmap. What's new here is the information of the spread of our measurements.
 
 ## Comparing Distributions: Weekdays VS Weekends
 
-It is easy to guess from the plots above that weekday and weekend average speed measurements have different distributions. Let's explore how the two distributions compare using our data from the bridge segment.
+It is easy to guess from the plots above that weekday and weekend congestion levels have different distributions. Let's explore how the two distributions compare using our data from the bridge segment.
 
 ```{r, fig.show='hold'}
 qqplot(
-  data.speed[data.speed$road == 167 & data.speed$weekend == TRUE, "speed"],
-  data.speed[data.speed$road == 167 & data.speed$weekend == FALSE, "speed"],
+  data.speed[data.speed$road == 167 & data.speed$weekend == TRUE, "congestion"],
+  data.speed[data.speed$road == 167 & data.speed$weekend == FALSE, "congestion"],
   ylab = "Weekday Distribution",
   xlab = "Weekend Distribution",
   main = "Ta7rir To Mohandesin"
 )
 qqplot(
-  data.speed[data.speed$road == 164 & data.speed$weekend == TRUE, "speed"],
-  data.speed[data.speed$road == 164 & data.speed$weekend == FALSE, "speed"],
+  data.speed[data.speed$road == 164 & data.speed$weekend == TRUE, "congestion"],
+  data.speed[data.speed$road == 164 & data.speed$weekend == FALSE, "congestion"],
   ylab = "Weekday Distribution",
   xlab = "Weekend Distribution",
   main = "Mohandesin To Ta7rir"
