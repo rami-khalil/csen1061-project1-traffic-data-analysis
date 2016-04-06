@@ -28,6 +28,7 @@ library(knitr)
 library(tidyr)
 library(reshape2)
 library(chron)
+library(stringr)
 
 getmode <- function(v) {
    uniqv <- unique(v)
@@ -259,7 +260,6 @@ data.road %>% select(speed) %>% is.na() %>% sum()
 The automatic reporter produces templated comments containing our desired values. We can use these to fine tune our speed column values.
 
 ```{r}
-library(stringr)
 regexp <- "(\\d+ km/h)|(\\d+ كم/س)"
 matched <- grepl(regexp, data.road$rd.rp.cm)
 
