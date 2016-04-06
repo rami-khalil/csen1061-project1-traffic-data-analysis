@@ -9,7 +9,7 @@ This document details the statistical analysis of traffice data collected from B
 
 ## Metrics of focus
 
-After the data was explored and cleaned, it was refined into only a few metrics: the road on which a report was made, the time a report was made, and the estimated average travel speed of the reporter. The analyses presented in this report mainly focus on these metrics and some of their derivatives such as the hour of day in the report and whether the report was made on a weekend.
+After the data was explored and cleaned, it was refined into only a few metrics: the road on which a report was made, the time a report was made, and the congestion level of the road. The analyses presented in this report mainly focus on these metrics and some of their derivatives such as the hour of day in the report and whether the report was made on a weekend.
 
 ## Descriptive means
 
@@ -212,7 +212,7 @@ rm(rpt_dupes)
 
 ## Extracting travel speeds
 
-We will now attempt to extrapolate travel speeds so we can use them as the main metric later on in our analysis.
+We will now attempt to extrapolate travel speeds so we can use them to approximate the main metric later on in our analysis.
 
 First, we will assume the following categorization for speed ranges:
 
@@ -473,23 +473,23 @@ Let's carry out a different form of focused analysis on another road segment. Fi
 data.speed$weekend <- data.speed$report_time %>% weekdays() %in% c("Friday", "Saturday")
 data.speed$report_hour <- data.speed$report_time %>% hours() %>% factor(levels = 0:23, labels = 0:23)
 
-average_speeds <- data.speed %>%
+data.central <- data.speed %>%
   group_by(road, weekend, report_hour) %>%
   summarise(
-    mean = mean(congestion),
-    sd = sd(congestion),
-    median = median(congestion),
-    mode = getmode(congestion),
-    count = n()) %>%
+    sample_mean = mean(congestion),
+    sample_sd = sd(congestion),
+    sample_median = median(congestion),
+    sample_mode = getmode(congestion),
+    sample_size = n()) %>%
   ungroup()
 
-average_speeds %>%
-  filter(count > 1) %>%
+data.central %>%
+  filter(sample_size > 1) %>%
   sample_n(size = 15) %>%
   kable()
 ```
 
-In the spirit of focusing our analyses on single segments or cohesive sets of roads, let us take an excursion into the distribution of travel speeds on the two directions of a 6th of October Bridge road segment:
+In the spirit of focusing our analyses on single segments or cohesive sets of roads, let us take an excursion into the distribution of congestion levels on the two directions of a 6th of October Bridge road segment:
 
 ID   |   Segment
 ---- | -----------------------------------
@@ -547,4 +547,31 @@ The above two Q-Q plots show that for both directions of the 6th of october brid
 
 # Inferential analyses
 
+The light in which we have cast our data, through grouping by report hour and focusing on congestion scores, permits us to easily isolate recurring flow patterns in road segments at certain times. In this section, we start attempting to make some general statements about traffic conditions using our data.
 
+## Confidence intervals for mean congestion scores
+
+We've previously calculated mean congestion scores for road segments during weekdays and weekends, let's now proceed to use those statistics to estimate one of our parameters, the mean, within a confidence interval of 95%.
+
+```{r}
+data.means <- data.central %>%
+  select(-c(sample_median, sample_mode)) %>%
+  filter(sample_size > 1) %>%
+  rowwise() %>%
+  mutate(
+    error = (qt(0.975, df = sample_size - 1)*sample_sd)/sqrt(sample_size),
+    lower = sample_mean - error,
+    upper = sample_mean + error)
+```
+
+## Hypothesis: 
+
+## Hypothesis: 
+
+# Excursion: Inter-rater reliability
+
+o baby!
+
+# Closing remarks
+
+sankyoo
