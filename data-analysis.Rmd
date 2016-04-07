@@ -570,19 +570,21 @@ Let's use this to examine the estimated means for congestion on a segment from t
 ```{r}
 data.means %>%
   filter(road == 317, weekend == FALSE) %>% (function(x) {
-    ggplot(x, aes(x = report_hour, y = sample_mean)) + 
-      geom_errorbar(aes(ymin=lower, ymax=upper), width=.1) +
-      geom_point()}) +
-      ggtitle("Da2ery, Suez Rd. To Tagamo3: Estimated congestion means within 95% confidence intervals") +
-      ylab("Estimated mean") +
-      xlab("Hour of day")
+  ggplot(x, aes(x = report_hour, y = sample_mean)) + 
+    geom_errorbar(aes(ymin=lower, ymax=upper), width=.1) +
+    geom_point() +
+    ggtitle("Da2ery, Suez Rd. To Tagamo3: Estimated congestion means") +
+    ylab("Estimated mean") +
+    xlab("Hour of day")})
 ```
 
-## Hypothesis: 
+## Hypothesis: One direction is more congested than the other
 
 ## Hypothesis: 
 
 # Excursion: Inter-rater reliability
+
+## Correlation: Speed vs Congestion
 
 o baby!
 
