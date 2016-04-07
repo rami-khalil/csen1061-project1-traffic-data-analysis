@@ -17,7 +17,7 @@ The metrics extracted from the data convey a great deal of time variant informat
 
 ## Inferential methodologies
 
-
+By using rudimentary inferential statistics, we estimate population means for congestion levels across roads along with their respective confidence intervals, and attempt to answer two main hypothesis about each road segment at a given hour of day: is there sufficient evidence for a difference in congestion between directions? and is there sufficient evidence for a difference in congestion between weekend and weekday traffic?
 
 # Data Processing
 
@@ -629,6 +629,8 @@ We now have a table of our hypothesis results for each group of congestion sampl
 results %>% sample_n(size = 15) %>% kable()
 ```
 
+It should be noted that not rejecting the null hypothesis is only stating that we do not have enough evidence to reject it, rather than accepting it.
+
 ## Hypothesis: Hourly congestion varies by weekday/weekend
 
 We simply follow the same steps as before, except we cast the data in a different light through grouping samples by different columns.
@@ -665,8 +667,4 @@ results %>% sample_n(size = 15) %>% kable()
 
 ## Correlation: Speed vs Congestion
 
-o baby!
-
-# Closing remarks
-
-sankyoo
+**Coming soon**
