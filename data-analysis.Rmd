@@ -581,9 +581,37 @@ data.means %>%
 
 ## Hypothesis: Hourly congestion depends on direction
 
-Using the previously calculated central tendencies data:
+We will hypothesize that the level of congestion on a road is different depending on which direction a car is travelling. To do this, we will rely on sampling the difference between the means of congestion level populations. Since we are not assuming that congestion level distributions are normally distributed, we will limit our analyises to times for which we have at least samples on both sides of the road to get a good estimate of both variances. Our null hypothesis will be that there is no difference between mean congestion levels.
 
-N >= 30 -> var
+$H_0: \mu_1 - \mu_2 = 0$
+
+We will assume at first that the null hypothesis is correct, and check that given our assumption is correct, what is the probability of reaching the resulting difference in mean that we have calculated. If that probability is below our chosen significance level, then we will reject the null hypothesis. Since our hypotheses are mutually exclusive, then we will choose to accept the alternate hypothesis $H_1$.
+
+$H_1: \mu_1 - \mu_2 \neq 0$
+
+This hypothesis is going to be tested across every segment of the ring road, across every hour of the day and across wether it is a weekend or a weekday. We are going to rely on the pre-defined t.test function to conduct our testing. Therefore, we will first isolate our sample data:
+
+```{r}
+samples <- data.speed %>%
+  filter(road %in% ring_road) %>%
+  group_by(road, weekend, report_hour) %>%
+  filter(n() >= 30) %>%
+  summarise(congestion_samples = list(congestion)) %>%
+  ungroup()
+samples_ccw <- data.speed %>%
+  filter(road %in% ring_road_ccw) %>%
+  group_by(road, weekend, report_hour) %>%
+  filter(n() >= 30) %>%
+  summarise(congestion_samples = list(congestion)) %>%
+  ungroup() %>%
+  rename(congestion_samples_ccw = congestion_samples)
+samples_ccw$road_ccw <- samples_ccw$road
+samples_ccw$road <- sapply(samples_ccw$road, function(x){ring_road[ which(x == ring_road_ccw) ]})
+
+target_samples <- merge(samples, samples_ccw)
+```
+
+We can now simply plug in our data into the built-in student t test function in R. The default confidence interval, which we will choose for out test, is at 95%.
 
 ```{r}
 mergeByDirection <- function(clockwise, counter_clockwise) {
@@ -593,23 +621,26 @@ mergeByDirection <- function(clockwise, counter_clockwise) {
   ccw <- data.central %>%
     filter(road %in% counter_clockwise, sample_size >= 30) %>%
     select(-c(sample_sd, sample_median, sample_mode)) %>%
-    rename(sample_mean_ccw = sample_mean, sample_variance_ccw = sample_variance, sample_size_ccw = sample_size)
+    rename(
+      sample_mean_ccw = sample_mean,
+      sample_variance_ccw = sample_variance,
+      sample_size_ccw = sample_size)
   ccw$road_ccw <- ccw$road
   ccw$road <- sapply(ccw$road, function(x){clockwise[ which(x == counter_clockwise) ]})
   return(merge(cw, ccw))
 }
 
-ring_road.means <- mergeByDirection(ring_road, ring_road_ccw) %>%
+ring_road.mean_diff <- mergeByDirection(ring_road, ring_road_ccw) %>%
   mutate(
     difference_mean = sample_mean - sample_mean_ccw,
-    difference_sd = sqrt(sample_variance/sample_size + sample_variance_ccw/sample_size_ccw)
-    )
+    difference_sd = sqrt(sample_variance/sample_size + sample_variance_ccw/sample_size_ccw)) %>%
+  select(-c(sample_mean, sample_mean_ccw, sa))
 ```
 
-$H_0: \mu_1 - \mu_2 = 0$
-$H_1: \mu_1 - \mu_2 \neq 0$
 
 ## Hypothesis: Hourly congestion varies by weekday/weekend
+
+We simply follow the same steps as before, except we cast the data in a different light.
 
 $H_0: \mu_1 - \mu_2 = 0$
 $H_1: \mu_1 - \mu_2 \neq 0$
