@@ -611,39 +611,55 @@ samples_ccw$road <- sapply(samples_ccw$road, function(x){ring_road[ which(x == r
 target_samples <- merge(samples, samples_ccw)
 ```
 
-We can now simply plug in our data into the built-in student t test function in R. The default confidence interval, which we will choose for out test, is at 95%.
+We can now simply plug in our data into the built-in t test function in R. The default confidence interval, which we will use for our purposes, is at 95%.
 
 ```{r}
-mergeByDirection <- function(clockwise, counter_clockwise) {
-  cw <- data.central %>%
-    filter(road %in% clockwise, sample_size >= 30) %>%
-    select(-c(sample_sd, sample_median, sample_mode))
-  ccw <- data.central %>%
-    filter(road %in% counter_clockwise, sample_size >= 30) %>%
-    select(-c(sample_sd, sample_median, sample_mode)) %>%
-    rename(
-      sample_mean_ccw = sample_mean,
-      sample_variance_ccw = sample_variance,
-      sample_size_ccw = sample_size)
-  ccw$road_ccw <- ccw$road
-  ccw$road <- sapply(ccw$road, function(x){clockwise[ which(x == counter_clockwise) ]})
-  return(merge(cw, ccw))
-}
-
-ring_road.mean_diff <- mergeByDirection(ring_road, ring_road_ccw) %>%
-  mutate(
-    difference_mean = sample_mean - sample_mean_ccw,
-    difference_sd = sqrt(sample_variance/sample_size + sample_variance_ccw/sample_size_ccw)) %>%
-  select(-c(sample_mean, sample_mean_ccw, sa))
+target_samples$pval <- target_samples %>% 
+  apply(1, function(x){
+    t.test(x$congestion_samples, x$congestion_samples_ccw)}) %>%
+  sapply(function(x){x$p.value})
+results <- target_samples %>%
+  select(-c(congestion_samples, congestion_samples_ccw)) %>%
+  mutate(rejectnull = pval < 0.05)
 ```
 
+We now have a table of our hypothesis results for each group of congestion samples. The **rejectnull** column is set to true when we have sufficient evidence in our data to reject the null hypothesis.
+
+```{r}
+results %>% sample_n(size = 15) %>% kable()
+```
 
 ## Hypothesis: Hourly congestion varies by weekday/weekend
 
-We simply follow the same steps as before, except we cast the data in a different light.
+We simply follow the same steps as before, except we cast the data in a different light through grouping samples by different columns.
 
-$H_0: \mu_1 - \mu_2 = 0$
-$H_1: \mu_1 - \mu_2 \neq 0$
+```{r}
+samples_weekday <- data.speed %>%
+  filter(weekend == FALSE) %>%
+  group_by(road, report_hour) %>%
+  filter(n() >= 30) %>%
+  summarise(congestion_samples_weekday = list(congestion)) %>%
+  ungroup()
+samples_weekend <- data.speed %>%
+  filter(weekend == TRUE) %>%
+  group_by(road, report_hour) %>%
+  filter(n() >= 30) %>%
+  summarise(congestion_samples = list(congestion)) %>%
+  ungroup() %>%
+  rename(congestion_samples_weekend = congestion_samples)
+
+target_samples <- merge(samples, samples_ccw)
+
+target_samples$pval <- target_samples %>% 
+  apply(1, function(x){
+    t.test(x$congestion_samples_weekday, x$congestion_samples_weekend)}) %>%
+  sapply(function(x){x$p.value})
+results <- target_samples %>%
+  select(-c(congestion_samples_weekday, congestion_samples_weekend)) %>%
+  mutate(rejectnull = pval < 0.05)
+
+results %>% sample_n(size = 15) %>% kable()
+```
 
 # Excursion: Inter-rater reliability
 
