@@ -1,0 +1,668 @@
+---
+title: Traffic Data Analysis
+output: html_document
+---
+
+# Preamble
+
+This document details the statistical analysis of traffice data collected from Bey2ollak.com. The data is first cleaned and processed to extract key traffice flow metrics. Then a stage of basic descriptive statistical analysis is undergone whereby various means of describing the data are attempted in order to empirically determine what are some meaningful methods of describing the data. Afterwards, some rudimentary inferential statistics is applied to answer some hypotheses about our metrics.
+
+## Metrics of focus
+
+After the data was explored and cleaned, it was refined into only a few metrics: the road on which a report was made, the time a report was made, and the congestion level of the road. The analyses presented in this report mainly focus on these metrics and some of their derivatives such as the hour of day in the report and whether the report was made on a weekend.
+
+## Descriptive means
+
+The metrics extracted from the data convey a great deal of time variant information about a complex network of traffic flow. In order to deliver any significant or actionable information about the data within the scope of basic statistical methods, narrowly focused descriptive analyses were carried out on selected road segments. A heatmap was used to describe the average congestion level patterns of the Ring Road in Cairo and appeared to deliver acceptable insight and highlight some reasonable patterns. Congestion levels across a segment of the 6th of October bridge were represented across time by a series of boxplots. This was useful in conveying some of the missing information in the heatmap, such as the variability of the measurements. Finally, Q-Q plots were used to answer the age old adage that traffic on the weekends is different from traffic on weekdays.
+
+## Inferential methodologies
+
+By using rudimentary inferential statistics, we estimate population means for congestion levels across roads along with their respective confidence intervals, and attempt to answer two main hypothesis about each road segment at a given hour of day: is there sufficient evidence for a difference in congestion between directions? and is there sufficient evidence for a difference in congestion between weekend and weekday traffic?
+
+# Data Processing
+
+```{r, echo=FALSE}
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(tidyr)
+library(reshape2)
+library(chron)
+library(stringr)
+library(scales)
+
+getmode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+```
+
+## Initialization
+
+We first load our CSV file and take a glimpse at its contents.
+
+```{r}
+data.raw <- read.csv('all-semi-unique.csv')
+glimpse(data.raw)
+```
+
+At first glance, we see that our raw data is composed of approximately 430k observations of 34 variables. Let us proceed to clean this data.
+
+## Advertising data removal
+
+Knowing that variables prefixed with **ad.** contain information relevant only to the application's advertising logic, we may safely drop them as they will not be used in our investigation.
+
+```{r}
+data.road <- data.raw %>%
+  select(-(starts_with("ad.")))
+```
+
+## Removing constant valued columns
+
+Now that we have dropped variables that will not be of interest, we can investigate for variables that always carry a constant value in our observations
+
+```{r}
+data.road %>%
+  sapply(unique) %>%
+  sapply(length)
+```
+
+We can spot two variables that are always constant: **rd.cl** and **rd.rp.type**. Since they add no information to our data, we may safely discard them. We then take note of the format the *crawl_date* variable is in.
+
+```{r}
+data.road <- data.road %>%
+  select(-(rd.cl), -(rd.rp.type))
+head(data.road$crawl_date)
+```
+
+## Crawl date format
+
+The crawl_date column currently contains a factor of different strings. We proceed to parse this into a more machine readable format as a column of time values.
+
+```{r}
+data.road$crawl_date <-
+  strptime(data.road$crawl_date, format = "%a %b %e %X UTC %Y", tz = "UTC") %>%
+  as.POSIXct()
+head(data.road$crawl_date)
+```
+
+## Report submission time estimation
+
+Upon further inspection of bey2ollak.com's response data: **rd.rp.hr** and **rd.rp.mn** are the time differences between the crawl date and the report submission time. This means we can estimate the time of the response submission accurately down to a minute, which should be sufficient for our purposes. 
+
+```{r}
+data.road <- data.road %>%
+  mutate(report_time = as.POSIXct(round(crawl_date - (rd.rp.hr*60*60 + rd.rp.mn*60), "mins"))) %>%
+  select(-c(rd.rp.mn, rd.rp.hr))
+```
+
+## Road status update time estimation
+
+**rd.hr** and **rd.mn** reflect how much time has passed since a road's status was updated on bey2ollak's end. We can extrapolate the last time a road's status was updated using similar means.
+
+```{r}
+data.road <- data.road %>%
+  mutate(last_road_update = as.POSIXct(round(crawl_date - (rd.hr*60*60 + rd.mn*60), "mins"))) %>%
+  select(-c(rd.mn, rd.hr))
+```
+
+## Road name split
+
+We note that **rd.nm** contains a combination of the major road name and the minor road name. Splitting this column into two separate columns will help clarify more information about major roads and their minor segments.
+
+```{r}
+data.road <- data.road %>%
+  separate(rd.nm, c("rd.majornm", "rd.minornm"), ";")
+```
+
+Some reports belong to a major road name as a whole with no minor road name. We proceed to replace the missing minor road names with a standard value.
+
+```{r}
+data.road$rd.minornm[is.na(data.road$rd.minornm)] <- "NO_MINOR"
+```
+
+We will now migrate the road names data to a different data frame in order to separate concerns.
+
+```{r}
+data.road_names <- data.road %>%
+  select(rd.ri, rd.majornm, rd.minornm) %>%
+  unique()
+num_ids <- data.road_names %>%
+  select(rd.ri) %>%
+  unique() %>%
+  nrow()
+num_entries <- data.road_names %>% nrow()
+num_ids == num_entries # # check for problems, expect TRUE
+rm(num_ids, num_entries) # cleanup env
+
+data.road <- data.road %>%
+  select(-c(rd.majornm, rd.minornm))
+```
+
+## Extracting road status snapshots
+
+Each crawl of the data represents a snapshot of all the road statuses at that time if we take the right perspective. Since every entry in our data is the road status data appended to some report data, we can isolate the road status information for analysis.
+
+First, let us ensure that we have only a single rd.stid for each road per crawl.
+
+```{r}
+numberOfTripletsWithSTID <- data.road %>%
+  select(crawl_date, rd.ri, rd.stid) %>%
+  unique() %>%
+  nrow()
+numberOfTriplets <- data.road %>%
+  select(crawl_date, rd.ri) %>%
+  unique() %>%
+  nrow()
+numberOfTriplets == numberOfTripletsWithSTID # check for problems, expect TRUE
+rm(numberOfTriplets, numberOfTripletsWithSTID) # cleanup env
+```
+
+We can now proceed to isolate road status snapshots knowing that taking unique pairs will not result in information loss.
+
+```{r}
+data.road.status <- data.road %>%
+  select(crawl_date, rd.ri, rd.stid) %>%
+  unique()
+table(data.road.status$rd.stid)
+```
+
+Unfortunately, due to the way the data was crawled, there is an overwhelming amount of rows with **rd.stid** equal to 10 (info). This destroys the information conveyed by bey2olak about the road and renders this approach useless unless we attempt to approximate the correct congestion levels.
+
+We choose discard the polluted column and attempt to follow a different approach. As we have also chosen to disregard the "snapshots" of road status, we may also discard the **crawl_date** and **last_road_update** columns.
+
+```{r}
+rm(data.road.status)
+data.road <- data.road %>%
+  select(-c(rd.stid, crawl_date, last_road_update)) %>%
+  unique()
+```
+
+## Application-specific data elimination
+
+We choose to discard **rd.new**, **rd.strq**, **rd.cmrq** and **rd.img** as they play a role in bey2ollak's application functionality and will not provide traffic insight.
+
+```{r}
+data.road <- data.road %>%
+  select(-c(rd.new, rd.strq, rd.cmrq, rd.img)) %>%
+  unique()
+```
+
+## User information
+
+We choose not to do any analysis on user profiles, such as inspecting wether users with profile images/full names tend to be more or less active, and drop both the **rd.rp.fullnm** and **rd.rp.img** columns.
+
+```{r}
+data.road <- data.road %>%
+  select(-c(rd.rp.fullnm, rd.rp.img)) %>%
+  unique()
+```
+
+## Report time estimate errors
+
+We are now in the position to partially account for some duplicates that result due to the error margin present in our report time estimates. We can remedy this by ignoring the possible *off-by-one* differences in **report_time** estimates resulting from our accruacy being limited to ± 1 minute.
+
+```{r}
+rpt_dupes <- data.road %>%
+  select(-(report_time)) %>%
+  duplicated()
+data.road <- data.road %>%
+  subset(!rpt_dupes)
+rm(rpt_dupes)
+```
+
+## Extracting travel speeds
+
+We will now attempt to extrapolate travel speeds so we can use them to approximate the main metric later on in our analysis.
+
+First, we will assume the following categorization for speed ranges:
+
+Classification  | Speed Range  | rd.rp.stid 
+--------------- | ------------ | -----------
+7alawa          | 80+          | 1
+lazeez          | 40-79        | 2
+mashy           | 20-39        | 3
+za7ma           | 10-19        | 4
+mafeesh amal    | 0-9          | 5
+
+The following rd.rp.stid values also correspond to different report types:
+
+Type          | rd.rp.stid
+------------- | -----------
+so2al         | 6
+khatar        | 7
+7adsa         | 8
+3otl          | 9
+ba2ollak eh   | 10
+
+A report can include both a congestion rating (7alawa - mafeesh 2amal) and/or a khatar/7adsa/3otl warning, or a report can be a so2al/ba2ollak eh. Unfortunately, the data crawling eliminated multiple <stid> tags and some information was lost. We can extract the questions since it is reasonable to assume they do not contribute to congestion level information.
+
+```{r}
+data.questions <- data.road %>%
+  filter(rd.rp.stid == 6)
+data.road <- data.road %>%
+  filter(rd.rp.stid != 6)
+data.road %>% nrow()
+```
+
+The automatic reporter produces templated comments containing our desired values. We can use these to populate a new speed column.
+
+```{r}
+data.road <- data.road %>%
+  mutate(speed = NA)
+regexp <- "(\\d+ km/h)|(\\d+ كم/س)"
+matched <- grepl(regexp, data.road$rd.rp.cm)
+
+subs <- data.road$rd.rp.cm %>%
+  subset(matched)
+matches <- regmatches(subs, regexpr(regexp, subs))
+data.road$speed[matched] <- gsub("\\D", " ", matches) %>%
+  str_trim(side = "both") %>%
+  as.integer()
+
+rm(regexp, matched, subs, matches)
+```
+
+We will proceed to use the above speeds to approximate the missing road status values.
+
+```{r}
+target_rows <- (data.road$rd.rp.stid > 5) & !(data.road$speed %>% is.na())
+
+score_4 <- target_rows & data.road$speed > 9
+score_3 <- target_rows & data.road$speed > 19
+score_2 <- target_rows & data.road$speed > 39
+score_1 <- target_rows & data.road$speed > 79
+
+data.road$rd.rp.stid[target_rows] <- 5
+data.road$rd.rp.stid[score_4] <- 4
+data.road$rd.rp.stid[score_3] <- 3
+data.road$rd.rp.stid[score_2] <- 2
+data.road$rd.rp.stid[score_1] <- 1
+
+(data.road$rd.rp.stid > 5) %>% sum()
+```
+
+Now we can isolate "ba2ollak eh" reports that do not contain any speed information. Furthermore, as the remaining NA values are randomly distributed across report_times, and are small in quantity relative to the remaining observation count, we will discard them.
+
+```{r}
+data.info <- data.road %>%
+  filter(rd.rp.stid == 10)
+data.road <- data.road %>%
+  filter(rd.rp.stid <= 5)
+```
+
+## Isolating Congestion Data
+
+```{r}
+data.speed <- data.road %>%
+  select(rd.ri, rd.rp.cmid, report_time, rd.rp.stid) %>%
+  rename(road = rd.ri, comment = rd.rp.cmid, congestion = rd.rp.stid) %>%
+  unique()
+```
+
+# Descriptive analyses
+
+We are now left with a clean set of observations of congestion levels across different roads at different times.
+
+```{r}
+glimpse(data.speed)
+```
+
+## Data distribution across time
+
+Our main concern in this report is not application usage analysis, but it will be useful to develop some insight into the distribution of our data points across our crawling timespan. This will help us identify any gaps in our knowledge of speed data.
+
+```{r}
+bins <- data.speed %>%
+  split(cut(data.speed$report_time, "hour"))
+sizes <- sapply(bins, nrow)
+plot(sizes, type = "l")
+```
+
+We can observe from the above plot that our data is quite sparse in the first few days and in the last day of our crawl range. Therefore, we will focus our analysis on the two weeks from 07/02 until 21/02, where our data is not assumed to have gaps.
+
+```{r}
+left_boundary <- as.POSIXct(strptime("2016-02-07 04:00:00", "%F %X"), tz = "UTC")
+right_boundary <- as.POSIXct(strptime("2016-02-21 04:00:00", "%F %X"), tz = "UTC")
+data.speed <- data.speed %>%
+  filter(report_time >= left_boundary, report_time < right_boundary)
+
+bins <- data.speed %>%
+  split(cut(data.speed$report_time, "hour"))
+sizes <- sapply(bins, nrow)
+plot(sizes, type = "l")
+```
+
+We can now see the distribution of our data across our chosen timespan.
+
+## Isolated Analysis Procedure
+
+Even though our data fits in memory, we have a plethora of information. Traffic flow data, even when only recorded sparsely for a couple of cities over two weeks, represents the ongoings of a very complex system with many intricacies that can not be easily summarized globaly. Therefore, we will carry out small practical analyses by isolating road segments to demonstrate how the data describes the traffic flow in some streets.
+
+```{r}
+roadAnalysis <- function(segments, L = left_boundary, R = right_boundary) {
+  focus <- data.speed %>%
+    filter(report_time >= L, report_time < R)
+  
+  bins <- focus %>%
+    split(cut(focus$report_time, "hour"))
+  
+  subs <- lapply(bins, function(bin) {
+    tmp <- bin %>% 
+      filter(road %in% segments) %>% 
+      group_by(road) %>% 
+      summarise(avg_spd = mean(congestion))
+    
+    ord <- tmp[order(factor(tmp$road, levels = segments)),]
+    
+    entries <- nrow(tmp)
+    
+    if (entries == 0) {
+      df <- data.frame(matrix(NA, ncol = 9, nrow = 1))
+      names(df) <- segments
+      return(df)
+    }
+    
+    dframe <- data.frame(matrix(0, ncol = nrow(tmp), nrow = 1))
+    names(dframe) <- ord$road
+    dframe[1,] <- ord$avg_spd
+    return(dframe)
+  })
+  
+  dframe <- bind_rows(subs)
+  dframe <- dframe[, as.character(segments)]
+  row.names(dframe) <- names(subs)
+  names(dframe) <- 1:9
+
+  dmatrix <- data.matrix(dframe)
+  return(dmatrix)
+}
+
+speedSegmentTimePlot <- function(dmatrix, segments) {
+  tmp <- data.road_names %>% filter(rd.ri %in% segments)
+  ord <- tmp[ order(factor(tmp$rd.ri, levels = segments)), "rd.minornm" ]
+  
+  return(
+    ggplot(melt(dmatrix), aes(Var2, Var1 %>% strptime(format = "%F %X", tz = "UTC") %>% as.POSIXct(), fill = value)) +
+      labs(x = "Segment", y = "Time", fill = "Avg. Congestion") +
+      scale_x_continuous(breaks = 1:length(ord), labels = ord) +
+      theme(axis.text.x = element_text(angle = 70, vjust = 0.5)) +
+      geom_raster(interpolate = TRUE) +
+      scale_y_datetime(breaks = date_breaks("4 hours")) + 
+      scale_fill_gradientn(
+        colours=c("#459B1A","#82C972","#DDD777","#CE8827","#DD2C2C"),
+        breaks = c(1, 2, 3, 4, 5),
+        labels = c("1 7alawa", "2 lazeez", "3 mashy", "4 za7ma", "5 mafeesh 2amal"))
+  )
+}
+```
+
+## Isolated Analysis - The Ring Road
+
+The ring road is the major highway in Cairo. Bey2ollak segments it into the following parts:
+
+ID   |   Segment
+---- | ------------------------------
+32   |          Moneeb To Autostrad
+281  |     Autostrad To Sokhna Exit
+315  |       Sokhna Exit To Tagamo3
+316  |          Tagamo3 To Suez Rd.
+302  |    Suez Rd. To Nafa2 ElSalam
+285  |      Nafa2 ElSalam To Zera3y
+286  |             Zera3y To Me7war
+122  |   Me7war To Waslet Maryoutia
+125  |   Waslet Maryoutia To Moneeb
+---  |    **Opposite Direction**
+126  |   Moneeb To Waslet Maryoutia
+121  |   Waslet Maryoutia To Me7war
+283  |             Me7war To Zera3y
+284  |      Zera3y To Nafa2 ElSalam
+301  |    Nafa2 ElSalam To Suez Rd.
+317  |          Suez Rd. To Tagamo3
+318  |       Tagamo3 To Sokhna Exit
+282  |     Sokhna Exit To Autostrad
+ 31  |          Autostrad To Moneeb
+```{r}
+ring_road     <- c(31, 282, 318, 317, 301, 284, 283, 121, 126)
+ring_road_ccw <- c(32, 281, 315, 316, 302, 285, 286, 122, 125)
+```
+
+Let's examine the congestion patterns across place and time for the ring road using a visual heatmap of the average congestion that we calculated.
+
+### Week One
+
+```{r fig.width=12, fig.height=10, fig.show='hold'}
+roadAnalysis(
+  ring_road,
+  as.POSIXct(strptime("2016-02-07 04:00:00", "%F %X"), tz = "UTC"),
+  as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC")) %>%
+  speedSegmentTimePlot(ring_road)
+roadAnalysis(
+  ring_road_ccw,
+  as.POSIXct(strptime("2016-02-07 04:00:00", "%F %X"), tz = "UTC"),
+  as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC")) %>%
+  speedSegmentTimePlot(ring_road_ccw)
+```
+
+We can see how nicely morning congestion in some counter-clockwise segments is complemented in the afternoon in the clock-wise segments. We will withhold from making any generalizations here and only keep to highlighting how informative and intuitive the above heatmap is when it comes to conveying information about our data.
+
+### Week Two
+
+```{r fig.width=12, fig.height=10, fig.show='hold'}
+roadAnalysis(
+  ring_road,
+  as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC"),
+  as.POSIXct(strptime("2016-02-21 04:00:00", "%F %X"), tz = "UTC")) %>%
+  speedSegmentTimePlot(ring_road)
+roadAnalysis(
+  ring_road_ccw,
+  as.POSIXct(strptime("2016-02-14 04:00:00", "%F %X"), tz = "UTC"),
+  as.POSIXct(strptime("2016-02-21 04:00:00", "%F %X"), tz = "UTC")) %>%
+  speedSegmentTimePlot(ring_road_ccw)
+```
+
+## Congestion levels central tendencies and spreads
+
+Let's carry out a different form of focused analysis on another road segment. First, we will need to differentiate between reports made on weekends and those made on weekdays. Then, we will combine the samples by the hours they were reported on in order to calculate some summaries about congestion at a given street and time.
+
+```{r}
+data.speed$weekend <- data.speed$report_time %>% weekdays() %in% c("Friday", "Saturday")
+data.speed$report_hour <- data.speed$report_time %>% hours() %>% factor(levels = 0:23, labels = 0:23)
+
+data.central <- data.speed %>%
+  group_by(road, weekend, report_hour) %>%
+  summarise(
+    sample_mean = mean(congestion),
+    sample_variance = var(congestion),
+    sample_sd = sd(congestion),
+    sample_median = median(congestion),
+    sample_mode = getmode(congestion),
+    sample_size = n()) %>%
+  ungroup()
+
+data.central %>%
+  filter(sample_size > 1) %>%
+  sample_n(size = 15) %>%
+  kable()
+```
+
+In the spirit of focusing our analyses on single segments or cohesive sets of roads, let us take an excursion into the distribution of congestion levels on the two directions of a 6th of October Bridge road segment:
+
+ID   |   Segment
+---- | -----------------------------------
+167  |  Ta7rir To Mohandesin
+164  |  Mohandesin To Ta7rir
+
+### 6th of October Bridge: Ta7rir To Mohandesin
+
+```{r, fig.show='hold'}
+data.speed %>%
+  filter(road == 167, weekend == FALSE) %>% (function(x) {
+  qplot(report_hour, congestion, data = x, geom = c("boxplot"), main = "Ta7rir To Mohandesin (Weekdays)")})
+data.speed %>%
+  filter(road == 167, weekend == TRUE) %>% (function(x) {
+  qplot(report_hour, congestion, data = x, geom = c("boxplot"), main = "Ta7rir To Mohandesin (Weekends)")})
+```
+
+### 6th of October Bridge: Mohandesin To Ta7rir
+
+```{r, fig.show='hold'}
+data.speed %>%
+  filter(road == 164, weekend == FALSE) %>% (function(x) {
+  qplot(report_hour, congestion, data = x, geom = c("boxplot"), main = "Mohandesin To Ta7rir (Weekdays)")})
+data.speed %>%
+  filter(road == 164, weekend == TRUE) %>% (function(x) {
+  qplot(report_hour, congestion, data = x, geom = c("boxplot"), main = "Mohandesin To Ta7rir (Weekends)")})
+```
+
+### Interpretation
+
+The box plots above convey some interesting information about the distribution of congestion across time that were not properly conveyed by our heatmap. What's new here is the information of the spread of our measurements.
+
+## Comparing Distributions: Weekdays VS Weekends
+
+It is easy to guess from the plots above that weekday and weekend congestion levels have different distributions. Let's explore how the two distributions compare using our data from the bridge segment.
+
+```{r, fig.show='hold'}
+qqplot(
+  data.speed[data.speed$road == 167 & data.speed$weekend == TRUE, "congestion"],
+  data.speed[data.speed$road == 167 & data.speed$weekend == FALSE, "congestion"],
+  ylab = "Weekday Distribution",
+  xlab = "Weekend Distribution",
+  main = "Ta7rir To Mohandesin"
+)
+qqplot(
+  data.speed[data.speed$road == 164 & data.speed$weekend == TRUE, "congestion"],
+  data.speed[data.speed$road == 164 & data.speed$weekend == FALSE, "congestion"],
+  ylab = "Weekday Distribution",
+  xlab = "Weekend Distribution",
+  main = "Mohandesin To Ta7rir"
+)
+```
+
+The above two Q-Q plots show that for both directions of the 6th of october bridge segment the weekend measurements and the weekday measurements follow two different distributions that exhibit different tail behavior. If the two distributions were similar, our plots would have a straight line shape.
+
+# Inferential analyses
+
+The light in which we have cast our data, through grouping by report hour and focusing on congestion scores, permits us to easily isolate recurring flow patterns in road segments at certain times. In this section, we start attempting to make some general statements about traffic conditions using our data.
+
+## Confidence intervals for mean congestion scores
+
+We've previously calculated mean congestion scores for road segments during weekdays and weekends, let's now proceed to use those statistics to estimate one of our parameters, the mean, within a confidence interval of 95%.
+
+```{r}
+data.means <- data.central %>%
+  select(-c(sample_median, sample_mode)) %>%
+  filter(sample_size > 1) %>%
+  rowwise() %>%
+  mutate(
+    error = (qt(0.975, df = sample_size - 1)*sample_sd)/sqrt(sample_size),
+    lower = sample_mean - error,
+    upper = sample_mean + error) %>%
+  select(-c(sample_sd, sample_size))
+```
+
+Let's use this to examine the estimated means for congestion on a segment from the ring road during workdays:
+
+```{r}
+data.means %>%
+  filter(road == 317, weekend == FALSE) %>% (function(x) {
+  ggplot(x, aes(x = report_hour, y = sample_mean)) + 
+    geom_errorbar(aes(ymin=lower, ymax=upper), width=.1) +
+    geom_point() +
+    ggtitle("Da2ery, Suez Rd. To Tagamo3: Estimated congestion means") +
+    ylab("Estimated mean") +
+    xlab("Hour of day")})
+```
+
+## Hypothesis: Hourly congestion depends on direction
+
+We will hypothesize that the level of congestion on a road is different depending on which direction a car is travelling. To do this, we will rely on sampling the difference between the means of congestion level populations. Since we are not assuming that congestion level distributions are normally distributed, we will limit our analyises to times for which we have at least samples on both sides of the road to get a good estimate of both variances. Our null hypothesis will be that there is no difference between mean congestion levels.
+
+$H_0: \mu_1 - \mu_2 = 0$
+
+We will assume at first that the null hypothesis is correct, and check that given our assumption is correct, what is the probability of reaching the resulting difference in mean that we have calculated. If that probability is below our chosen significance level, then we will reject the null hypothesis. Since our hypotheses are mutually exclusive, then we will choose to accept the alternate hypothesis $H_1$.
+
+$H_1: \mu_1 - \mu_2 \neq 0$
+
+This hypothesis is going to be tested across every segment of the ring road, across every hour of the day and across wether it is a weekend or a weekday. We are going to rely on the pre-defined t.test function to conduct our testing. Therefore, we will first isolate our sample data:
+
+```{r}
+samples <- data.speed %>%
+  filter(road %in% ring_road) %>%
+  group_by(road, weekend, report_hour) %>%
+  filter(n() >= 30) %>%
+  summarise(congestion_samples = list(congestion)) %>%
+  ungroup()
+samples_ccw <- data.speed %>%
+  filter(road %in% ring_road_ccw) %>%
+  group_by(road, weekend, report_hour) %>%
+  filter(n() >= 30) %>%
+  summarise(congestion_samples = list(congestion)) %>%
+  ungroup() %>%
+  rename(congestion_samples_ccw = congestion_samples)
+samples_ccw$road_ccw <- samples_ccw$road
+samples_ccw$road <- sapply(samples_ccw$road, function(x){ring_road[ which(x == ring_road_ccw) ]})
+
+target_samples <- merge(samples, samples_ccw)
+```
+
+We can now simply plug in our data into the built-in t test function in R. The default confidence interval, which we will use for our purposes, is at 95%.
+
+```{r}
+target_samples$pval <- target_samples %>% 
+  apply(1, function(x){
+    t.test(x$congestion_samples, x$congestion_samples_ccw)}) %>%
+  sapply(function(x){x$p.value})
+results <- target_samples %>%
+  select(-c(congestion_samples, congestion_samples_ccw)) %>%
+  mutate(rejectnull = pval < 0.05)
+```
+
+We now have a table of our hypothesis results for each group of congestion samples. The **rejectnull** column is set to true when we have sufficient evidence in our data to reject the null hypothesis.
+
+```{r}
+results %>% sample_n(size = 15) %>% kable()
+```
+
+It should be noted that not rejecting the null hypothesis is only stating that we do not have enough evidence to reject it, rather than accepting it.
+
+### Remark
+
+A different pair of hypothesis tests could have been conducted to determine significant congestion shifts rather than simple congestion difference by testing for $\mu_{x_1 - x_2} > 1$ and $\mu_{x_1 - x_2} < 1$.
+
+## Hypothesis: Hourly congestion varies by weekday/weekend
+
+We simply follow the same steps as before, except we cast the data in a different light through grouping samples by different columns.
+
+```{r}
+samples_weekday <- data.speed %>%
+  filter(weekend == FALSE) %>%
+  group_by(road, report_hour) %>%
+  filter(n() >= 30) %>%
+  summarise(congestion_samples_weekday = list(congestion)) %>%
+  ungroup()
+samples_weekend <- data.speed %>%
+  filter(weekend == TRUE) %>%
+  group_by(road, report_hour) %>%
+  filter(n() >= 30) %>%
+  summarise(congestion_samples = list(congestion)) %>%
+  ungroup() %>%
+  rename(congestion_samples_weekend = congestion_samples)
+
+target_samples <- merge(samples_weekday, samples_weekend)
+
+target_samples$pval <- target_samples %>% 
+  apply(1, function(x){
+    t.test(x$congestion_samples_weekday, x$congestion_samples_weekend)}) %>%
+  sapply(function(x){x$p.value})
+results <- target_samples %>%
+  select(-c(congestion_samples_weekday, congestion_samples_weekend)) %>%
+  mutate(rejectnull = pval < 0.05)
+
+results %>% sample_n(size = 15) %>% kable()
+```
+
+# Excursion: Inter-rater reliability
+
+**Cancelled**
