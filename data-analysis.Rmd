@@ -29,6 +29,7 @@ library(tidyr)
 library(reshape2)
 library(chron)
 library(stringr)
+library(scales)
 
 getmode <- function(v) {
    uniqv <- unique(v)
@@ -382,21 +383,16 @@ speedSegmentTimePlot <- function(dmatrix, segments) {
   ord <- tmp[ order(factor(tmp$rd.ri, levels = segments)), "rd.minornm" ]
   
   return(
-    ggplot(melt(dmatrix), aes(Var2, Var1, fill = value)) + 
+    ggplot(melt(dmatrix), aes(Var2, Var1 %>% strptime(format = "%F %X", tz = "UTC") %>% as.POSIXct(), fill = value)) +
       labs(x = "Segment", y = "Time", fill = "Avg. Congestion") +
       scale_x_continuous(breaks = 1:length(ord), labels = ord) +
       theme(axis.text.x = element_text(angle = 70, vjust = 0.5)) +
       geom_raster(interpolate = TRUE) +
-      #scale_fill_gradientn(colours=c("#FF0000FF", "#00FF00FF", "#99FF00FF"))
+      scale_y_datetime(breaks = date_breaks("4 hours")) + 
       scale_fill_gradientn(
-        #colours=c("#DD2C2C", "#CE8827", "#DDD777", "#82C972", "#459B1A"),
-        colours=c(
-          "#459B1A",
-          "#82C972",
-          "#DDD777",
-          "#CE8827",
-          "#DD2C2C"),
-        breaks = c(1, 2, 3, 4, 5))
+        colours=c("#459B1A","#82C972","#DDD777","#CE8827","#DD2C2C"),
+        breaks = c(1, 2, 3, 4, 5),
+        labels = c("1 7alawa", "2 lazeez", "3 mashy", " 4 za7ma", "5 mafeesh 2amal"))
   )
 }
 ```
