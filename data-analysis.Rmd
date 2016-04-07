@@ -650,7 +650,7 @@ samples_weekend <- data.speed %>%
   ungroup() %>%
   rename(congestion_samples_weekend = congestion_samples)
 
-target_samples <- merge(samples, samples_ccw)
+target_samples <- merge(samples_weekday, samples_weekend)
 
 target_samples$pval <- target_samples %>% 
   apply(1, function(x){
@@ -664,7 +664,5 @@ results %>% sample_n(size = 15) %>% kable()
 ```
 
 # Excursion: Inter-rater reliability
-
-## Correlation: Speed vs Congestion
 
 **Coming soon**
