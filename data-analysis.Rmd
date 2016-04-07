@@ -477,6 +477,7 @@ data.central <- data.speed %>%
   group_by(road, weekend, report_hour) %>%
   summarise(
     sample_mean = mean(congestion),
+    sample_variance = var(congestion),
     sample_sd = sd(congestion),
     sample_median = median(congestion),
     sample_mode = getmode(congestion),
@@ -578,9 +579,40 @@ data.means %>%
     xlab("Hour of day")})
 ```
 
-## Hypothesis: One direction is more congested than the other
+## Hypothesis: Hourly congestion depends on direction
 
-## Hypothesis: 
+Using the previously calculated central tendencies data:
+
+N >= 30 -> var
+
+```{r}
+mergeByDirection <- function(clockwise, counter_clockwise) {
+  cw <- data.central %>%
+    filter(road %in% clockwise, sample_size >= 30) %>%
+    select(-c(sample_sd, sample_median, sample_mode))
+  ccw <- data.central %>%
+    filter(road %in% counter_clockwise, sample_size >= 30) %>%
+    select(-c(sample_sd, sample_median, sample_mode)) %>%
+    rename(sample_mean_ccw = sample_mean, sample_variance_ccw = sample_variance, sample_size_ccw = sample_size)
+  ccw$road_ccw <- ccw$road
+  ccw$road <- sapply(ccw$road, function(x){clockwise[ which(x == counter_clockwise) ]})
+  return(merge(cw, ccw))
+}
+
+ring_road.means <- mergeByDirection(ring_road, ring_road_ccw) %>%
+  mutate(
+    difference_mean = sample_mean - sample_mean_ccw,
+    difference_sd = sqrt(sample_variance/sample_size + sample_variance_ccw/sample_size_ccw)
+    )
+```
+
+$H_0: \mu_1 - \mu_2 = 0$
+$H_1: \mu_1 - \mu_2 \neq 0$
+
+## Hypothesis: Hourly congestion varies by weekday/weekend
+
+$H_0: \mu_1 - \mu_2 = 0$
+$H_1: \mu_1 - \mu_2 \neq 0$
 
 # Excursion: Inter-rater reliability
 
